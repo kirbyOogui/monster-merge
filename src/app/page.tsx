@@ -1,69 +1,41 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
 
-export default function Home() {
+export default function TitlePage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 32,
+        padding: 24,
+        textAlign: "center",
+        background:
+          "radial-gradient(ellipse at 50% 30%, rgba(78,203,113,0.18), transparent 60%), linear-gradient(180deg, #16281c 0%, #0e1720 70%)",
+      }}
+    >
+      <div>
+        <h1 style={{ fontSize: "2rem", marginBottom: 8, textShadow: "0 2px 0 rgba(0,0,0,0.4)" }}>
+          モンスター合体タワーディフェンス
+        </h1>
+        <p style={{ opacity: 0.75, fontSize: "0.95rem" }}>
+          4×4の盤面にモンスターを配置・合体させて、押し寄せる敵を迎え撃とう
+        </p>
+      </div>
+
+      <nav style={{ display: "flex", flexDirection: "column", gap: 16, width: 240 }}>
+        <Link href="/game" style={{ ...startButtonStyle(true), padding: "14px 0", fontSize: "1.1rem" }}>
+          スタート
+        </Link>
+        <Link href="/ranking" style={{ ...secondaryButtonStyle(true), padding: "14px 0" }}>
+          ランキング
+        </Link>
+      </nav>
+
+      <p style={{ opacity: 0.5, fontSize: "0.75rem", marginTop: 32 }}>縦画面推奨（PC / スマホブラウザ対応）</p>
+    </main>
   );
 }
