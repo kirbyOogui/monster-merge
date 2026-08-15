@@ -91,8 +91,27 @@ export default function GamePage() {
             </div>
           </div>
 
-          {snapshot.phase === "initial-placement" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4, fontSize: 12 }}>
+          {/* Both blocks are always mounted, stacked in the same grid cell via
+           * `gridArea` and toggled with `visibility` (not conditional
+           * rendering) — so this row's height is always the taller of the
+           * two, constant across every phase (including battle, where
+           * neither is visible). Without this, the panel grew when a wave
+           * ended and reward's longer text/2-button row replaced battle's
+           * empty space, which shrank the whole scaled layout (see
+           * `updateScale` above — it rescales to whatever this content's
+           * natural height is) every single time a wave ended
+           * ("ウェーブ間になると画面全体が小さくなってしまう"). */}
+          <div style={{ display: "grid", marginTop: 4 }}>
+            <div
+              style={{
+                gridArea: "1 / 1",
+                visibility: snapshot.phase === "initial-placement" ? "visible" : "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                fontSize: 12,
+              }}
+            >
               <span style={{ opacity: 0.8 }}>手持ちの3体を盤面にドラッグして配置してください</span>
               <button
                 disabled={!session.canStartFirstWave}
@@ -102,10 +121,16 @@ export default function GamePage() {
                 ウェーブ開始
               </button>
             </div>
-          )}
-
-          {snapshot.phase === "reward" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4, fontSize: 12 }}>
+            <div
+              style={{
+                gridArea: "1 / 1",
+                visibility: snapshot.phase === "reward" ? "visible" : "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                fontSize: 12,
+              }}
+            >
               <span style={{ opacity: 0.8 }}>
                 好きな数だけ盤面にドラッグして配置できます。盤面のモンスターを上のトレイへ戻すと候補に並び直します
               </span>
@@ -122,7 +147,7 @@ export default function GamePage() {
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div style={{ width: "100%", overflowX: "auto" }}>
