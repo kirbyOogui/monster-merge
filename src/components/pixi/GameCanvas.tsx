@@ -92,6 +92,13 @@ const ENEMY_SPRITE_PATHS: Record<string, string> = Object.fromEntries(
   ENEMY_IDS.map((id) => [id, `/assets/enemies/${id}.png`]),
 );
 const ENEMY_DEFAULT_FRAME_COUNT = 5;
+
+/** Painted forest-clearing scene (PixelLab, "Create S-XL image (new)")
+ * replacing the original placeholder background of flat rectangles/
+ * triangle "trees" (see `drawBackground` below, kept as a fallback for
+ * if this 404s). Not sized to CANVAS_W/CANVAS_H exactly — see
+ * `buildBackgroundSprite`, which cover-scales and center-crops it. */
+const BACKGROUND_SPRITE_PATH = "/assets/backgrounds/forest_battlefield.png";
 /** slime's redesign (rounder, warmer-faced — see the `sizeScale` comment
  * on `EnemyDef`) landed with 9 frames per animation instead of the usual
  * 5, since its Frame Count slider wouldn't respond to keyboard input
@@ -655,9 +662,23 @@ class EnemyView {
   }
 }
 
-/** Simple procedural "forest camp" backdrop — no real art yet (that's
- * Phase6), just enough color/shape to read as outdoors rather than a
- * bare dark rectangle. */
+/** Cover-scales `BACKGROUND_SPRITE_PATH`'s painted forest scene to fill
+ * the canvas exactly (like CSS `background-size: cover`) — the source
+ * art's aspect ratio doesn't exactly match CANVAS_W:CANVAS_H, so this
+ * scales up by whichever axis needs it more and center-crops the other,
+ * rather than stretching (distorted) or fitting (letterboxed) it. */
+function buildBackgroundSprite(texture: Texture): Sprite {
+  const sprite = new Sprite(texture);
+  const scale = Math.max(CANVAS_W / texture.width, CANVAS_H / texture.height);
+  sprite.width = texture.width * scale;
+  sprite.height = texture.height * scale;
+  sprite.position.set((CANVAS_W - sprite.width) / 2, (CANVAS_H - sprite.height) / 2);
+  return sprite;
+}
+
+/** Fallback backdrop — flat rectangles/triangle "trees" — used only if
+ * `BACKGROUND_SPRITE_PATH` fails to load (see `buildBackgroundSprite`
+ * for the real art normally shown instead). */
 function drawBackground(): Graphics {
   const g = new Graphics();
   g.rect(0, 0, CANVAS_W, CANVAS_H).fill(0x1c3a24);
@@ -777,6 +798,13 @@ export default function GameCanvas({ session }: Props) {
       }
       containerRef.current?.appendChild(app.canvas);
 
+      let backgroundTexture: Texture | null = null;
+      try {
+        backgroundTexture = await Assets.load(BACKGROUND_SPRITE_PATH);
+      } catch (err) {
+        console.warn(`Failed to load background sprite: ${BACKGROUND_SPRITE_PATH}`, err);
+      }
+
       const textures = new Map<string, Texture>();
       await Promise.all(
         Object.entries(SPECIES_SPRITE_PATHS).map(async ([key, url]) => {
@@ -828,7 +856,7 @@ export default function GameCanvas({ session }: Props) {
         return;
       }
 
-      app.stage.addChild(drawBackground());
+      app.stage.addChild(backgroundTexture ? buildBackgroundSprite(backgroundTexture) : drawBackground());
       drawStaticBoard(app.stage);
       const traySlotLayer = new Container();
       const monsterLayer = new Container();
