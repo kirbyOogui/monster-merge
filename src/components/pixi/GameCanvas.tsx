@@ -1760,5 +1760,10 @@ export default function GameCanvas({ session }: Props) {
     };
   }, []);
 
-  return <div ref={containerRef} className="inline-block" />;
+  // `touchAction: "none"` stops the browser from treating a press-and-hold
+  // drag gesture here as a scroll/selection gesture of its own — without
+  // it, a long-press on a monster (to start dragging it) could instead
+  // trigger the browser's native text-selection or (on mobile) its
+  // copy/share callout, fighting with Pixi's own pointer-based dragging.
+  return <div ref={containerRef} className="inline-block" style={{ touchAction: "none" }} />;
 }
