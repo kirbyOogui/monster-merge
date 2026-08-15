@@ -43,7 +43,18 @@ export default function GamePage() {
     function updateScale() {
       if (!el) return;
       const naturalHeight = el.scrollHeight;
-      if (naturalHeight === 0) return;
+      // GameCanvas's own root div starts with no explicit height and only
+      // gets its real size once Pixi's async `app.init()` resolves and
+      // appends the canvas (see GameCanvas.tsx) — so there's a brief
+      // window, right after the dynamic import resolves but before that
+      // effect finishes, where this container is mounted but collapsed to
+      // near-zero height. Without this guard, that transient reading could
+      // get latched in as the "smallest ever seen" natural height below,
+      // permanently pinning the scale at an enormous, broken value (this
+      // actually happened: "変なところでドアップになって操作不能"). The
+      // canvas itself is always exactly CANVAS_H once mounted, so anything
+      // shorter than that is this transitional state, not a real reading.
+      if (naturalHeight < CANVAS_H) return;
       minNaturalHeightRef.current = Math.min(minNaturalHeightRef.current, naturalHeight);
       // Prioritize filling the full vertical space ("縦いっぱいに使う") — this
       // portrait-oriented game is almost always height-constrained on a

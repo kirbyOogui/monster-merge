@@ -49,7 +49,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
   troll: {
     id: "troll",
     name: "トロール",
-    baseHp: 250,
+    baseHp: 350,
     baseSpeed: 0.07,
     baseDamage: 43,
     coinDropChance: 0.4,
@@ -59,7 +59,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
   giant: {
     id: "giant",
     name: "ジャイアント",
-    baseHp: 480,
+    baseHp: 700,
     baseSpeed: 0.06,
     baseDamage: 74,
     coinDropChance: 0.4,
