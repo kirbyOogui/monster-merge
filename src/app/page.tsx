@@ -27,40 +27,16 @@ export default function TitlePage() {
         alignItems: "center",
         justifyContent: "center",
         gap: 32,
-        padding: 24,
+        padding: "24px 16px",
         textAlign: "center",
         background:
           "radial-gradient(ellipse at 50% 30%, rgba(78,203,113,0.18), transparent 60%), linear-gradient(180deg, #16281c 0%, #0e1720 70%)",
       }}
     >
       <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            animation: "title-float 3.5s ease-in-out infinite, title-glow 3.5s ease-in-out infinite",
-          }}
-        >
+        <div className="title-logo-row">
           <Sparkle size={16} delay={0} />
-          <h1
-            style={{
-              fontFamily: "var(--font-dot-gothic)",
-              fontSize: "clamp(2.1rem, 9vw, 3rem)",
-              letterSpacing: "0.04em",
-              lineHeight: 1.3,
-              color: "#ffd24d",
-              background: "linear-gradient(180deg, #fff3c4 0%, #ffd24d 55%, #f0c94e 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              filter:
-                "drop-shadow(-2px 0 0 #231409) drop-shadow(2px 0 0 #231409) drop-shadow(0 -2px 0 #231409) drop-shadow(0 3px 0 #231409)",
-            }}
-          >
-            がったいモンスターズ
-          </h1>
+          <h1 className="title-logo-text">がったいモンスターズ</h1>
           <Sparkle size={16} delay={1.2} />
         </div>
         <p style={{ opacity: 0.75, fontSize: "0.95rem", marginTop: 16 }}>

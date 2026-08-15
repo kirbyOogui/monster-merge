@@ -19,6 +19,22 @@ export const BASE_MAX_HP = 10000;
 /** How often a breached enemy (parked at the base) re-deals its damage. */
 const ENEMY_ATTACK_INTERVAL_MS = 1000;
 
+/** An enemy only becomes a valid attack target once it's walked at least
+ * this far down the lane (0=spawn/top, 1=base). Enemies below the
+ * threshold still advance normally; they just can't be targeted yet.
+ *
+ * 0.3 wasn't enough: it bounds how early an enemy *can* be attacked, but
+ * not how fast it dies once it crosses that line. By wave 3+ the board
+ * has several merged-up monsters whose combined DPS one/two-shots an
+ * enemy the instant it passes 0.3 — since that's still only 30% down a
+ * lane that's mostly occluded by the top HUD/tray band, kills kept
+ * landing before the enemy had visibly cleared into open space
+ * ("見えてから攻撃可能になるように"). Raised well past the midpoint so an
+ * enemy has to be solidly, unambiguously on-screen — not merely eligible
+ * — before combat DPS (which scales with player progression, not with
+ * this constant) can touch it. */
+const MIN_ATTACKABLE_PROGRESS = 0.55;
+
 /**
  * How long to linger in "battle" after the last enemy is gone before
  * flipping to "reward". Without this, the reward offer UI can appear
@@ -268,7 +284,7 @@ export class BattleEngine {
     for (const monster of this.board) {
       const stats = resolveMonsterStats(monster.shape, monster.level);
       const alive = this.enemies
-        .filter((e) => e.hp > 0)
+        .filter((e) => e.hp > 0 && e.progress >= MIN_ATTACKABLE_PROGRESS)
         .sort((a, b) => b.progress - a.progress);
       if (alive.length === 0) continue;
 

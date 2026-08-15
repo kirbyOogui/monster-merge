@@ -3,13 +3,13 @@ import { defaultRng, pickWeighted, type Rng } from "./rng";
 import type { Level, RewardOfferEntry } from "./types";
 
 /** Higher level = lower probability, per design ("高Lvは低確率"). Lv3's
- * share was cut roughly in half (8 → 4) at the user's request, making a
+ * share has been cut twice at the user's request (8 → 4 → 2), making a
  * Lv4 (only reachable by merging two hard-won Lv3s) a rarer, more
  * deliberate payoff instead of something that shows up often. */
 const REWARD_LEVEL_WEIGHTS: [Level, number][] = [
-  [1, 69],
+  [1, 71],
   [2, 27],
-  [3, 4],
+  [3, 2],
 ];
 
 export const REWARD_OFFER_SIZE = 3;

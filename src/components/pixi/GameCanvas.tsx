@@ -15,7 +15,7 @@ import {
 } from "pixi.js";
 import gsap from "gsap";
 import type { GameSession } from "@/hooks/useGameSession";
-import { clampAnchor, type TrayItem } from "@/game/session";
+import { clampAnchor, tryMergeTrayItems, type TrayItem } from "@/game/session";
 import { MONSTER_SPECIES, getSpecies } from "@/game/monsters";
 import { ENEMY_DEFS, ENEMY_IDS } from "@/game/enemies";
 import { canPlace, findMonsterAtCell } from "@/game/board";
@@ -97,12 +97,19 @@ const ENEMY_DEFAULT_FRAME_COUNT = 5;
  * 5, since its Frame Count slider wouldn't respond to keyboard input
  * during generation (the same intermittent PixelLab UI glitch hit before
  * on bouldros_lv4's idle) and the default of 8+keep-first got submitted
- * before that was noticed. */
-const ENEMY_FRAME_COUNT_OVERRIDES: Partial<Record<string, number>> = {
+ * before that was noticed. troll was generated from PixelLab's newer
+ * preset library ("Running (4 frames)" / "Cross Punch") instead of the
+ * older Custom Animation V3 flow the first 4 enemies used, and those
+ * presets don't share a frame count with each other, let alone the old
+ * default — hence a per-kind override instead of one number per enemy. */
+const ENEMY_FRAME_COUNT_OVERRIDES: Partial<Record<string, number | Partial<Record<"walk" | "attack", number>>>> = {
   slime: 9,
+  troll: { walk: 4, attack: 6 },
+  giant: { walk: 4, attack: 6 },
 };
 function enemyAnimFramePaths(enemyId: string, kind: "walk" | "attack"): string[] {
-  const count = ENEMY_FRAME_COUNT_OVERRIDES[enemyId] ?? ENEMY_DEFAULT_FRAME_COUNT;
+  const override = ENEMY_FRAME_COUNT_OVERRIDES[enemyId];
+  const count = (typeof override === "number" ? override : override?.[kind]) ?? ENEMY_DEFAULT_FRAME_COUNT;
   return Array.from({ length: count }, (_, i) => `/assets/enemies/${enemyId}_${kind}_${i}.png`);
 }
 interface EnemyAnim {
@@ -1414,11 +1421,23 @@ export default function GameCanvas({ session }: Props) {
             // (merge) counts as a valid drop — otherwise snap back rather
             // than falling through to a board placement at row 0.
             const target = findOverlappingTraySlot(state, state.item.offerId);
-            if (!target || !sessionRef.current.mergeTrayItems(state.item.offerId, target.item.offerId)) {
+            const mergedItem = target ? tryMergeTrayItems(target.item, state.item) : null;
+            if (!target || !mergedItem || !sessionRef.current.mergeTrayItems(state.item.offerId, target.item.offerId)) {
               snapBack(state);
             } else {
+              // Both source slots vanish and the merged result is appended
+              // to the *end* of the tray (see useGameSession's
+              // placeTrayItem/mergeTrayItems), so with one fewer candidate
+              // every row's centering shifts — `target.homePx` is the
+              // stale pre-merge slot. Predict the post-merge layout instead
+              // of waiting for the next React render to run the real one.
+              const predictedTray = sessionRef.current.tray
+                .filter((i) => i.offerId !== state.item!.offerId && i.offerId !== target.item.offerId)
+                .concat(mergedItem);
+              const { positions } = computeTrayLayout(predictedTray);
+              const pos = positions.get(mergedItem.offerId) ?? target.homePx;
               const { w, h } = shapeSizePx(target.item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
-              spawnMergeGlow(target.homePx.x + w / 2, target.homePx.y + h / 2);
+              spawnMergeGlow(pos.x + w / 2, pos.y + h / 2);
             }
           } else {
             const outcome = sessionRef.current.placeTrayItem(state.item, anchor);
@@ -1506,24 +1525,17 @@ export default function GameCanvas({ session }: Props) {
         }
       }
 
-      function syncTray(tray: TrayItem[]) {
-        const key = tray.map((t) => t.offerId).join(",");
-        if (key === renderedTrayKey) return;
-        renderedTrayKey = key;
-
-        for (const v of trayViews) {
-          trayLayer.removeChild(v.container);
-          traySpriteLayer.removeChild(v.spriteContainer);
-        }
-        traySlotLayer.removeChildren();
-        trayViews = [];
-
-        // All candidates share one frame and the same fixed cell size —
-        // laid out left-to-right, each only as wide as its own shape,
-        // wrapping onto additional rows when a row would otherwise
-        // overflow the frame (e.g. three wide h3 candidates at once)
-        // rather than growing the frame to fit every combination. Each
-        // row is then centered independently within the frame.
+      /** All candidates share one frame and the same fixed cell size — laid
+       * out left-to-right, each only as wide as its own shape, wrapping onto
+       * additional rows when a row would otherwise overflow the frame (e.g.
+       * three wide h3 candidates at once) rather than growing the frame to
+       * fit every combination. Each row is then centered independently
+       * within the frame. Shared between `syncTray` (the actual visual
+       * layout) and `endDrag`'s tray-merge glow, which needs to predict
+       * where the surviving item will land *after* a merge shrinks the tray
+       * and shifts every row's centering — without waiting for the next
+       * React render to run this same layout for real. */
+      function computeTrayLayout(tray: TrayItem[]) {
         const usableWidth = TRAY_FRAME_W - TRAY_PAD * 2;
         interface RowEntry {
           item: TrayItem;
@@ -1548,70 +1560,90 @@ export default function GameCanvas({ session }: Props) {
         const rowHeights = rows.map((row) => Math.max(...row.map((r) => r.h)) + 14);
         const frameHeight =
           TRAY_PAD * 2 + rowHeights.reduce((sum, h) => sum + h, 0) + TRAY_ROW_GAP * Math.max(0, rows.length - 1);
-        traySlotLayer.addChild(drawTrayFrame(frameHeight));
 
+        const positions = new Map<string, { x: number; y: number }>();
         let cursorY = TRAY_Y + TRAY_PAD;
         rows.forEach((row, rowIndex) => {
           const rowWidth = row.reduce((sum, r) => sum + r.w, 0) + TRAY_ITEM_GAP * Math.max(0, row.length - 1);
           let cursorX = TRAY_X0 + Math.max(TRAY_PAD, (TRAY_FRAME_W - rowWidth) / 2);
-
-          row.forEach(({ item, w, h }) => {
-            const homePx = { x: cursorX, y: cursorY };
-
-            const species = getSpecies(item.speciesId);
-            const container = new Container();
-            const body = new Graphics();
-            drawBody(body, item.shape, species.color, TRAY_CELL, TRAY_TILE_MARGIN, 1, item.level);
-            container.addChild(body);
-            const stars = new Graphics();
-            drawShapeStars(stars, item.shape, TRAY_CELL, TRAY_CELL * 0.32);
-            container.addChild(stars);
-            const spriteContainer = new Container();
-            const texture = getMonsterTexture(textures, item.speciesId, item.level);
-            if (texture) {
-              const sprite = createMonsterSprite(
-                texture,
-                w,
-                h,
-                w * MONSTER_SIZE_BOOST,
-                h * MONSTER_SIZE_BOOST,
-                isSquareShape(item.shape),
-              );
-              spriteContainer.addChild(sprite);
-            }
-            const label = new Text({
-              text: `Lv${item.level}`,
-              style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" },
-            });
-            label.position.set(2, 1);
-            container.addChild(label);
-            const nameLabel = new Text({
-              text: species.name,
-              style: { fill: 0xcfe8ff, fontSize: 10 },
-            });
-            nameLabel.position.set(0, h + 2);
-            container.addChild(nameLabel);
-            container.position.set(homePx.x, homePx.y);
-            // Kept to the tile footprint, not the boosted sprite's full
-            // bounds — see the matching note on MonsterView.updateHitArea
-            // for why an expanded hitArea risks stealing clicks from a
-            // tightly-packed neighboring candidate.
-            container.hitArea = new Rectangle(0, 0, w, h);
-            container.eventMode = "static";
-            container.cursor = "grab";
-            container.on("pointerdown", (e: FederatedPointerEvent) => {
-              beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: homePx });
-            });
-            spriteContainer.position.set(homePx.x, homePx.y);
-            trayLayer.addChild(container);
-            traySpriteLayer.addChild(spriteContainer);
-            trayViews.push({ container, spriteContainer, item, homePx });
-
+          row.forEach(({ item, w }) => {
+            positions.set(item.offerId, { x: cursorX, y: cursorY });
             cursorX += w + TRAY_ITEM_GAP;
           });
-
           cursorY += rowHeights[rowIndex] + TRAY_ROW_GAP;
         });
+
+        return { positions, frameHeight };
+      }
+
+      function syncTray(tray: TrayItem[]) {
+        const key = tray.map((t) => t.offerId).join(",");
+        if (key === renderedTrayKey) return;
+        renderedTrayKey = key;
+
+        for (const v of trayViews) {
+          trayLayer.removeChild(v.container);
+          traySpriteLayer.removeChild(v.spriteContainer);
+        }
+        traySlotLayer.removeChildren();
+        trayViews = [];
+
+        const { positions, frameHeight } = computeTrayLayout(tray);
+        traySlotLayer.addChild(drawTrayFrame(frameHeight));
+
+        for (const item of tray) {
+          const { w, h } = shapeSizePx(item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
+          const homePx = positions.get(item.offerId)!;
+
+          const species = getSpecies(item.speciesId);
+          const container = new Container();
+          const body = new Graphics();
+          drawBody(body, item.shape, species.color, TRAY_CELL, TRAY_TILE_MARGIN, 1, item.level);
+          container.addChild(body);
+          const stars = new Graphics();
+          drawShapeStars(stars, item.shape, TRAY_CELL, TRAY_CELL * 0.32);
+          container.addChild(stars);
+          const spriteContainer = new Container();
+          const texture = getMonsterTexture(textures, item.speciesId, item.level);
+          if (texture) {
+            const sprite = createMonsterSprite(
+              texture,
+              w,
+              h,
+              w * MONSTER_SIZE_BOOST,
+              h * MONSTER_SIZE_BOOST,
+              isSquareShape(item.shape),
+            );
+            spriteContainer.addChild(sprite);
+          }
+          const label = new Text({
+            text: `Lv${item.level}`,
+            style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" },
+          });
+          label.position.set(2, 1);
+          container.addChild(label);
+          const nameLabel = new Text({
+            text: species.name,
+            style: { fill: 0xcfe8ff, fontSize: 10 },
+          });
+          nameLabel.position.set(0, h + 2);
+          container.addChild(nameLabel);
+          container.position.set(homePx.x, homePx.y);
+          // Kept to the tile footprint, not the boosted sprite's full
+          // bounds — see the matching note on MonsterView.updateHitArea
+          // for why an expanded hitArea risks stealing clicks from a
+          // tightly-packed neighboring candidate.
+          container.hitArea = new Rectangle(0, 0, w, h);
+          container.eventMode = "static";
+          container.cursor = "grab";
+          container.on("pointerdown", (e: FederatedPointerEvent) => {
+            beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: homePx });
+          });
+          spriteContainer.position.set(homePx.x, homePx.y);
+          trayLayer.addChild(container);
+          traySpriteLayer.addChild(spriteContainer);
+          trayViews.push({ container, spriteContainer, item, homePx });
+        }
       }
 
       // PixiJS's Ticker re-schedules its own next requestAnimationFrame at

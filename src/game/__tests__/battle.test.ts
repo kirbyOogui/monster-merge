@@ -58,7 +58,13 @@ describe("BattleEngine", () => {
     const snapshot = engine.getSnapshot();
     expect(snapshot.phase).toBe("reward");
     expect(snapshot.killCount).toBe(1);
-    expect(snapshot.baseHp).toBe(BASE_MAX_HP);
+    // Not necessarily a *flawless* defense anymore: MIN_ATTACKABLE_PROGRESS
+    // (0.55, raised so enemies stay visible longer before becoming
+    // targetable — see battle.ts) leaves a single Lv1 1x1's slow DPS little
+    // margin against a full-speed slime, so one breach tick can land before
+    // the kill lands. The point of this test is cross-board targeting
+    // (col 3 monster vs. a far-left spawn), not a zero-leak guarantee.
+    expect(snapshot.baseHp).toBeGreaterThan(BASE_MAX_HP - 100);
     expect(ticks).toBeLessThan(300);
   });
 
@@ -114,7 +120,12 @@ describe("BattleEngine", () => {
       ],
     };
     engine.startWave(wave);
-    const events = engine.tick(1000);
+    // Enemies only become attackable once they've walked past
+    // MIN_ATTACKABLE_PROGRESS (0.55) — orc's speed needs ~6.1s of simulated
+    // time to get there, so a single big tick stands in for "wait until
+    // they're within range" rather than the old "attackable the instant
+    // they spawn".
+    const events = engine.tick(7000);
     const attackEvents = events.filter((e) => e.type === "attack");
     expect(attackEvents).toHaveLength(1);
     expect(attackEvents[0].targetIds).toHaveLength(1);
@@ -130,7 +141,9 @@ describe("BattleEngine", () => {
       ],
     };
     engine.startWave(wave);
-    const events = engine.tick(1000);
+    // See the v2 test above: needs enough simulated time for orc to cross
+    // MIN_ATTACKABLE_PROGRESS before either becomes targetable.
+    const events = engine.tick(7000);
     const attackEvents = events.filter((e) => e.type === "attack");
     expect(attackEvents).toHaveLength(1);
     expect(attackEvents[0].targetIds).toHaveLength(2);
@@ -139,8 +152,10 @@ describe("BattleEngine", () => {
   it("always focuses the frontmost enemy (highest progress) first, regardless of spawn position", () => {
     const engine = new BattleEngine([monster({ shape: "1x1", anchor: { row: 0, col: 0 } })]);
     // Same spawn time, but "bat" is faster than "slime" so it pulls ahead
-    // in progress within the very first tick — targeting must follow
-    // progress, not spawnX or spawn order.
+    // in progress — targeting must follow progress, not spawnX or spawn
+    // order. 3000ms is enough for bat to cross MIN_ATTACKABLE_PROGRESS
+    // (0.55) while slime (slower) is still below it, which also reinforces
+    // that only the attackable one is even a candidate.
     engine.startWave({
       wave: 1,
       spawns: [
@@ -148,7 +163,7 @@ describe("BattleEngine", () => {
         { spawnX: 0.1, enemyId: "slime", delayMs: 0 },
       ],
     });
-    const events = engine.tick(100);
+    const events = engine.tick(3000);
     const attack = events.find((e) => e.type === "attack");
     expect(attack?.type).toBe("attack");
     const batId = engine.getSnapshot().enemies.find((e) => e.defId === "bat")?.instanceId;

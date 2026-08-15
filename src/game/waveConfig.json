@@ -3,13 +3,15 @@
   "enemyCountPerWave": 10.0,
   "maxEnemyCount": 200,
   "spawnIntervalMs": 650,
-  "hpGrowthPerWave": 0.12,
+  "hpGrowthPerWave": 0.15,
   "speedGrowthPerWave": 0.015,
-  "damageGrowthPerWave": 0.08,
+  "damageGrowthPerWave": 0.1,
   "enemyUnlocks": {
     "slime": 1,
     "goblin": 2,
     "bat": 3,
-    "orc": 5
+    "orc": 5,
+    "troll": 8,
+    "giant": 14
   }
 }

@@ -90,12 +90,14 @@ export const SHAPE_COMBAT: Record<ShapeId, ShapeCombatStats> = {
  * of investment for one Lv4), so its jump from Lv3 was widened well past
  * the arithmetic +0.4-per-level pattern the earlier levels follow, at the
  * user's request ("味方のレベル４をもっと強力にして") to make that
- * investment pay off much more dramatically. */
+ * investment pay off much more dramatically. Later dialed back a notch
+ * (7.0 attack / 0.65 interval → 6.0 / 0.7) after the user found Lv4
+ * overtuned — still a clear jump above Lv3, just less of a DPS cliff. */
 const LEVEL_ATTACK_MULTIPLIER: Record<Level, number> = {
   1: 1,
   2: 1.8,
   3: 3.0,
-  4: 7.0,
+  4: 6.0,
 };
 
 /** Attack interval shrinks (faster hands) as level rises. */
@@ -103,7 +105,7 @@ const LEVEL_INTERVAL_MULTIPLIER: Record<Level, number> = {
   1: 1,
   2: 0.92,
   3: 0.84,
-  4: 0.65,
+  4: 0.7,
 };
 
 export function shapeExtent(shape: ShapeId): { rows: number; cols: number } {
