@@ -3,8 +3,9 @@ import type { Vec2 } from "@/game/types";
 /**
  * Portrait layout: enemies spawn near the top and walk DOWN toward the
  * board, which sits near the bottom of the canvas ("味方は下側"). Enemies
- * scatter freely across the board's width (no lane grid) — every monster
- * can threaten any enemy, so placement affects capacity/merging, not
+ * scatter freely across a centered lane (see `LANE_X`/`LANE_PX` below,
+ * narrower than the board) — every monster can threaten any enemy
+ * regardless of column, so placement affects capacity/merging, not
  * defended zones.
  */
 export const CELL = 64;
@@ -14,6 +15,21 @@ export const BOARD_X = (CANVAS_W - BOARD_PX) / 2;
 export const LANE_TOP_Y = 20;
 export const BOARD_Y = 280;
 export const CANVAS_H = BOARD_Y + BOARD_PX + 16;
+
+/**
+ * Horizontal band enemies actually walk within, decoupled from the
+ * board/placement grid (`BOARD_X`/`BOARD_PX`) — a 2.5 : 5 : 2.5 split of
+ * the canvas width (left tree margin : road : right tree margin, per the
+ * user's spec), narrower than the board so the background road art (also
+ * generated at this same width) has room on both sides for trees without
+ * enemies visually running through them. The board itself is unaffected:
+ * it's still the full 4-cell grid at its usual width/position, just wider
+ * than this lane — outer columns end up placing monsters slightly past
+ * the road's edge, which is fine since targeting already has "no lane
+ * restriction" (any monster can threaten any enemy regardless of column).
+ */
+export const LANE_PX = CANVAS_W * 0.5;
+export const LANE_X = (CANVAS_W - LANE_PX) / 2;
 
 /**
  * Outside of battle, the tray (hand / reward candidates) is drawn in the
@@ -38,9 +54,9 @@ export function cellTopLeft(anchor: Vec2): { x: number; y: number } {
   return { x: BOARD_X + anchor.col * CELL, y: BOARD_Y + anchor.row * CELL };
 }
 
-/** Maps a scattered spawn fraction (0..1) to an x position across the board's width. */
+/** Maps a scattered spawn fraction (0..1) to an x position across the enemy lane's width. */
 export function pathX(spawnX: number): number {
-  return BOARD_X + spawnX * BOARD_PX;
+  return LANE_X + spawnX * LANE_PX;
 }
 
 /** y position for progress 0 (spawn, far/top) .. 1 (reaches the board's top edge). */

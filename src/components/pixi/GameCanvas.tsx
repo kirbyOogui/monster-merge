@@ -29,6 +29,8 @@ import {
   CANVAS_H,
   CANVAS_W,
   CELL,
+  LANE_PX,
+  LANE_X,
   TRAY_CELL,
   TRAY_FRAME_W,
   TRAY_ITEM_GAP,
@@ -683,8 +685,8 @@ function drawBackground(): Graphics {
   const g = new Graphics();
   g.rect(0, 0, CANVAS_W, CANVAS_H).fill(0x1c3a24);
 
-  const pathX0 = BOARD_X - 22;
-  const pathX1 = BOARD_X + BOARD_PX + 22;
+  const pathX0 = LANE_X;
+  const pathX1 = LANE_X + LANE_PX;
   g.moveTo(pathX0, 0).lineTo(pathX1, 0).lineTo(pathX1, CANVAS_H).lineTo(pathX0, CANVAS_H).fill({
     color: 0x6b5638,
     alpha: 0.55,
