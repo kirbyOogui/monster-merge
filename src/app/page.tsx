@@ -1,5 +1,21 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
+
+/** Small 4-pointed sparkle, flanking the logo — echoes the ☆ tile motif and
+ * the merge-glow effect's gold sparkle particles (`GameCanvas.tsx`'s
+ * `spawnMergeGlow`), tying the title screen to the game's own visual language. */
+function Sparkle({ size, delay }: { size: number; delay: number }) {
+  const style: CSSProperties = {
+    width: size,
+    height: size,
+    background: "linear-gradient(135deg, #fff3c4, #ffd24d)",
+    clipPath: "polygon(50% 0%, 61% 35%, 100% 50%, 61% 65%, 50% 100%, 39% 65%, 0% 50%, 39% 35%)",
+    animation: `title-twinkle 2.4s ease-in-out ${delay}s infinite`,
+    flexShrink: 0,
+  };
+  return <div style={style} />;
+}
 
 export default function TitlePage() {
   return (
@@ -18,10 +34,36 @@ export default function TitlePage() {
       }}
     >
       <div>
-        <h1 style={{ fontSize: "2rem", marginBottom: 8, textShadow: "0 2px 0 rgba(0,0,0,0.4)" }}>
-          モンスター合体タワーディフェンス
-        </h1>
-        <p style={{ opacity: 0.75, fontSize: "0.95rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            animation: "title-float 3.5s ease-in-out infinite, title-glow 3.5s ease-in-out infinite",
+          }}
+        >
+          <Sparkle size={16} delay={0} />
+          <h1
+            style={{
+              fontFamily: "var(--font-dot-gothic)",
+              fontSize: "clamp(2.1rem, 9vw, 3rem)",
+              letterSpacing: "0.04em",
+              lineHeight: 1.3,
+              color: "#ffd24d",
+              background: "linear-gradient(180deg, #fff3c4 0%, #ffd24d 55%, #f0c94e 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              filter:
+                "drop-shadow(-2px 0 0 #231409) drop-shadow(2px 0 0 #231409) drop-shadow(0 -2px 0 #231409) drop-shadow(0 3px 0 #231409)",
+            }}
+          >
+            がったいモンスターズ
+          </h1>
+          <Sparkle size={16} delay={1.2} />
+        </div>
+        <p style={{ opacity: 0.75, fontSize: "0.95rem", marginTop: 16 }}>
           4×4の盤面にモンスターを配置・合体させて、押し寄せる敵を迎え撃とう
         </p>
       </div>

@@ -1202,6 +1202,62 @@ export default function GameCanvas({ session }: Props) {
         });
       }
 
+      /** Plays at the resulting tile whenever a drag-drop actually merges
+       * two monsters into a leveled-up one (not a plain move/placement) —
+       * "重ねて合体する際に光るような、合体してるのが伝わるような演出".
+       * Deliberately the *opposite* motion from `spawnAttackEffect`'s
+       * outward burst: a ring of sparkles flies inward and collapses into
+       * a bright flash, so it reads as two things fusing together rather
+       * than something exploding. */
+      function spawnMergeGlow(x: number, y: number) {
+        const outerRing = new Graphics();
+        outerRing.circle(0, 0, 10).stroke({ color: 0xffd24d, width: 3, alpha: 0.95 });
+        outerRing.position.set(x, y);
+        effectsLayer.addChild(outerRing);
+        gsap.to(outerRing.scale, { x: 4.5, y: 4.5, duration: 0.42, ease: "power1.out" });
+        gsap.to(outerRing, { alpha: 0, duration: 0.42, onComplete: () => effectsLayer.removeChild(outerRing) });
+
+        // Sparkle stars start on a ring around the tile and fly *inward*,
+        // arriving right as the flash below pops — the "combining" read.
+        const starCount = 10;
+        for (let i = 0; i < starCount; i++) {
+          const star = new Graphics();
+          const size = randRange(3, 5);
+          star.star(0, 0, 4, size, size * 0.4).fill({ color: 0xfff3c4, alpha: 0.95 });
+          const angle = (Math.PI * 2 * i) / starCount + randRange(-0.15, 0.15);
+          const dist = randRange(34, 50);
+          star.position.set(x + Math.cos(angle) * dist, y + Math.sin(angle) * dist);
+          star.alpha = 0;
+          star.rotation = randRange(0, Math.PI * 2);
+          effectsLayer.addChild(star);
+          gsap
+            .timeline({ onComplete: () => effectsLayer.removeChild(star) })
+            .to(star, { alpha: 1, duration: 0.08 })
+            .to(star, { x, y, rotation: star.rotation + randRange(2, 4), duration: 0.26, ease: "power2.in" }, "<")
+            .to(star, { alpha: 0, duration: 0.1 }, "-=0.08");
+        }
+
+        // Bright pop, timed to land just as the inward sparkles converge.
+        gsap.delayedCall(0.24, () => {
+          const flash = new Graphics();
+          flash.circle(0, 0, 8).fill({ color: 0xffffff, alpha: 1 });
+          flash.position.set(x, y);
+          flash.scale.set(0.3);
+          effectsLayer.addChild(flash);
+          gsap.to(flash.scale, { x: 3, y: 3, duration: 0.22, ease: "power2.out" });
+          gsap.to(flash, { alpha: 0, duration: 0.28, delay: 0.03, onComplete: () => effectsLayer.removeChild(flash) });
+
+          const burst = new Graphics();
+          burst.circle(0, 0, 6).fill({ color: 0xffd24d, alpha: 0.85 });
+          burst.position.set(x, y);
+          effectsLayer.addChild(burst);
+          gsap.to(burst.scale, { x: 3.6, y: 3.6, duration: 0.34, ease: "power1.out" });
+          gsap.to(burst, { alpha: 0, duration: 0.34, onComplete: () => effectsLayer.removeChild(burst) });
+
+          spawnSparkParticles(x, y, 0xffe8a3, 8);
+        });
+      }
+
       app.stage.eventMode = "static";
       app.stage.hitArea = app.screen;
 
@@ -1338,8 +1394,19 @@ export default function GameCanvas({ session }: Props) {
           if (anchor.row < 0) {
             // Dropped above the board, into the tray/lane band: return it there.
             if (!sessionRef.current.discardMonster(state.instanceId)) snapBack(state);
-          } else if (!sessionRef.current.moveMonster(state.instanceId, anchor)) {
-            snapBack(state);
+          } else {
+            const outcome = sessionRef.current.moveMonster(state.instanceId, anchor);
+            if (outcome === "failed") {
+              snapBack(state);
+            } else if (outcome === "merged") {
+              // `moveMonster` clamps the drop internally, so recompute the
+              // same clamped anchor here rather than trusting the raw one
+              // — otherwise a drop dragged out of bounds would glow at the
+              // wrong (unclamped) spot.
+              const { x, y } = cellTopLeft(clampAnchor(state.shape, anchor));
+              const { w, h } = shapeSizePx(state.shape, CELL, BOARD_TILE_MARGIN);
+              spawnMergeGlow(x + w / 2, y + h / 2);
+            }
           }
         } else if (state.kind === "tray" && state.item) {
           if (anchor.row < 0) {
@@ -1349,9 +1416,19 @@ export default function GameCanvas({ session }: Props) {
             const target = findOverlappingTraySlot(state, state.item.offerId);
             if (!target || !sessionRef.current.mergeTrayItems(state.item.offerId, target.item.offerId)) {
               snapBack(state);
+            } else {
+              const { w, h } = shapeSizePx(target.item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
+              spawnMergeGlow(target.homePx.x + w / 2, target.homePx.y + h / 2);
             }
-          } else if (!sessionRef.current.placeTrayItem(state.item, anchor)) {
-            snapBack(state);
+          } else {
+            const outcome = sessionRef.current.placeTrayItem(state.item, anchor);
+            if (outcome === "failed") {
+              snapBack(state);
+            } else if (outcome === "merged") {
+              const { x, y } = cellTopLeft(clampAnchor(state.item.shape, anchor));
+              const { w, h } = shapeSizePx(state.item.shape, CELL, BOARD_TILE_MARGIN);
+              spawnMergeGlow(x + w / 2, y + h / 2);
+            }
           }
         }
       }

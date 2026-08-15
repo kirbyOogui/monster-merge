@@ -15,6 +15,11 @@ import {
 import type { Vec2 } from "@/game/types";
 import { generateWave } from "@/game/waves";
 
+/** Outcome of a drag-drop, distinguishing a merge from a plain
+ * placement/move — the view layer uses this to know when to play the
+ * "合体" glow effect (only on an actual merge, not every successful drop). */
+export type DropOutcome = "placed" | "merged" | "moved" | "failed";
+
 export interface GameSession {
   snapshot: GameRunState;
   /** Reads the engine's *current* state directly, bypassing React —
@@ -35,11 +40,11 @@ export interface GameSession {
   getSnapshot: () => GameRunState;
   tray: TrayItem[];
   canStartFirstWave: boolean;
-  placeTrayItem: (item: TrayItem, anchor: Vec2) => boolean;
+  placeTrayItem: (item: TrayItem, anchor: Vec2) => DropOutcome;
   /** Merges one tray/candidate item into another matching one, before
    * either touches the board. */
   mergeTrayItems: (draggedOfferId: string, targetOfferId: string) => boolean;
-  moveMonster: (instanceId: string, anchor: Vec2) => boolean;
+  moveMonster: (instanceId: string, anchor: Vec2) => DropOutcome;
   /** Drags a placed monster back into the tray: returns it to hand during
    * initial placement, or back into the reward candidates during the
    * reward phase. Returns false (caller should snap it back) when there's
@@ -65,9 +70,9 @@ export function useGameSession(): GameSession {
   }, [snapshot.phase, snapshot.rewardOffer, initialHand]);
 
   const placeTrayItem = useCallback(
-    (item: TrayItem, anchor: Vec2): boolean => {
+    (item: TrayItem, anchor: Vec2): DropOutcome => {
       const result = placeFromTray(engine.getBoard(), item, anchor);
-      if (!result.ok) return false;
+      if (!result.ok) return "failed";
       engine.setBoard(result.board);
 
       if (snapshot.phase === "initial-placement") {
@@ -77,7 +82,7 @@ export function useGameSession(): GameSession {
         // only removes that one, the rest stay pickable.
         engine.removeRewardOfferItem(item.offerId);
       }
-      return true;
+      return result.kind;
     },
     [engine, snapshot.phase],
   );
@@ -112,15 +117,15 @@ export function useGameSession(): GameSession {
   );
 
   const moveMonster = useCallback(
-    (instanceId: string, anchor: Vec2): boolean => {
+    (instanceId: string, anchor: Vec2): DropOutcome => {
       // Board layout is locked once combat starts ("バトル中は位置を変える
       // ことはできないように") — only valid during placement/reward, where
       // there's no active fight to exploit mid-battle repositioning in.
-      if (snapshot.phase === "battle") return false;
+      if (snapshot.phase === "battle") return "failed";
       const result = moveBoardMonster(engine.getBoard(), instanceId, anchor);
-      if (!result.ok) return false;
+      if (!result.ok) return "failed";
       engine.setBoard(result.board);
-      return true;
+      return result.kind;
     },
     [engine, snapshot.phase],
   );

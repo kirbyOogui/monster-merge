@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DotGothic16, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,14 +12,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/** Japanese dot-matrix pixel font, used for the game's logo/title lettering
+ * (title screen `<h1>`) — everywhere else keeps the default sans body font. */
+const dotGothic16 = DotGothic16({
+  variable: "--font-dot-gothic",
+  weight: "400",
+  subsets: ["latin"],
+  preload: false,
+});
+
 export const metadata: Metadata = {
-  title: "モンスター合体タワーディフェンス",
+  title: "がったいモンスターズ",
   description: "4×4の盤面にモンスターを配置して合体させ、押し寄せる敵を迎え撃つブラウザゲーム",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="ja" className={`${geistSans.variable} ${geistMono.variable} ${dotGothic16.variable}`}>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );
