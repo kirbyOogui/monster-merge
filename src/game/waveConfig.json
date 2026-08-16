@@ -12,6 +12,7 @@
     "bat": 3,
     "orc": 5,
     "troll": 8,
-    "giant": 14
-  }
+    "giant": 9
+  },
+  "bossDebut": { "enemyId": "giant", "count": 3 }
 }

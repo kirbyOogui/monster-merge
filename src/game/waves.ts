@@ -12,6 +12,14 @@ interface WaveConfig {
   speedGrowthPerWave: number;
   damageGrowthPerWave: number;
   enemyUnlocks: Record<string, number>;
+  /** A flagship enemy's debut wave gets a small, guaranteed batch of it
+   * instead of being left to `pickEnemyId`'s normal weighting — a
+   * just-unlocked id's weight (`1 / (wave - unlockWave + 1)`) peaks at 1
+   * right on its unlock wave, which at this wave's enemy count would flood
+   * the wave with dozens of it rather than the "2-3体" a freshly-unlocked
+   * flagship enemy should announce itself with. From the following wave
+   * onward it merges into the normal weighted pool like any other unlock. */
+  bossDebut?: { enemyId: string; count: number };
 }
 
 const waveConfig = waveConfigJson as WaveConfig;
@@ -28,8 +36,8 @@ function availableEnemyIds(wave: number): string[] {
     .map(([id]) => id);
 }
 
-function pickEnemyId(wave: number, rng: Rng): string {
-  const ids = availableEnemyIds(wave);
+function pickEnemyId(wave: number, rng: Rng, excludeId?: string): string {
+  const ids = availableEnemyIds(wave).filter((id) => id !== excludeId);
   // Earlier-unlocking enemies stay common; later ones are rarer additions.
   const weighted: [string, number][] = ids.map((id) => [
     id,
@@ -49,9 +57,23 @@ export function waveScaling(wave: number) {
 
 export function generateWave(wave: number, rng: Rng = defaultRng): WaveDefinition {
   const count = enemyCountForWave(wave);
+
+  const debut = waveConfig.bossDebut;
+  const isDebutWave = debut !== undefined && waveConfig.enemyUnlocks[debut.enemyId] === wave;
+  const debutCount = isDebutWave ? Math.min(debut.count, count) : 0;
+  // Spread the debut copies out through the wave (not bunched at the very
+  // start) so the flagship enemy reads as a threat that appears partway
+  // through, not an opening gauntlet.
+  const debutIndices = new Set(
+    Array.from({ length: debutCount }, (_, k) => Math.floor((count * (k + 0.5)) / debutCount)),
+  );
+
   const spawns: WaveSpawnEntry[] = [];
   for (let i = 0; i < count; i++) {
-    const enemyId = pickEnemyId(wave, rng);
+    const enemyId =
+      isDebutWave && debut !== undefined && debutIndices.has(i)
+        ? debut.enemyId
+        : pickEnemyId(wave, rng, isDebutWave ? debut?.enemyId : undefined);
     if (!ENEMY_DEFS[enemyId]) continue;
     spawns.push({
       // Scattered across the board's width — no lane snapping.

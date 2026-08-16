@@ -15,6 +15,14 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  /* This is a drag-driven game, not a scrollable document — a touchpad/
+   * touchscreen swipe should never be read as "navigate back/forward" (a
+   * horizontal swipe) or "pull to refresh" (a vertical overscroll at the
+   * top). `none` opts the whole page out of both native browser gestures
+   * in Chromium-based browsers (Chrome/Edge, desktop and Android); iOS
+   * Safari's edge-swipe-back is a system-level gesture outside a page's
+   * control and isn't affected by this. */
+  overscroll-behavior: none;
 }
 
 body {

@@ -22,6 +22,11 @@ export default function TitlePage() {
     <main
       style={{
         flex: 1,
+        // Fixed to the viewport height (rather than growing with content)
+        // and clipped, matching /game's no-scroll policy — a title screen
+        // is a single held frame, not a document to scroll through.
+        height: "100dvh",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
