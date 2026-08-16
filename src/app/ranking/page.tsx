@@ -81,6 +81,7 @@ export default async function RankingPage() {
       </div>
 
       <Link
+        className="press-btn"
         href="/"
         style={secondaryButtonStyle(true)}
       >

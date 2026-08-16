@@ -40,10 +40,10 @@ export default function TitlePage() {
       </div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 16, width: 240 }}>
-        <Link href="/game" style={{ ...startButtonStyle(true), padding: "14px 0", fontSize: "1.1rem" }}>
+        <Link className="press-btn" href="/game" style={{ ...startButtonStyle(true), padding: "14px 0", fontSize: "1.1rem" }}>
           スタート
         </Link>
-        <Link href="/ranking" style={{ ...secondaryButtonStyle(true), padding: "14px 0" }}>
+        <Link className="press-btn" href="/ranking" style={{ ...secondaryButtonStyle(true), padding: "14px 0" }}>
           ランキング
         </Link>
       </nav>

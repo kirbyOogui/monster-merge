@@ -95,6 +95,28 @@ button {
   }
 }
 
+/* Shared "press" motion for the pill-style CTA buttons (start/reroll/
+ * secondary, everywhere they're used) — hovering lifts the button slightly
+ * and pressing sinks it flush with its own drop-shadow "lip" collapsing,
+ * selling a physical push-button feel instead of the flat instant
+ * color-swap a plain `:hover`/`:active` on the raw color would give.
+ * `:not(:disabled)` only guards native `<button>`s — the `Link`-based
+ * buttons here are never rendered disabled, so it's a no-op for those. */
+.press-btn {
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.press-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.press-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  filter: brightness(0.96);
+  box-shadow: none !important;
+}
+
 /* Title screen logo image — float/glow animation carried over from the
  * previous text-based logo. */
 .title-logo-row {

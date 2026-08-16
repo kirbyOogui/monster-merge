@@ -157,6 +157,7 @@ export default function GamePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
               <span style={{ opacity: 0.8 }}>3体を盤面へドラッグ</span>
               <button
+                className="press-btn"
                 disabled={!session.canStartFirstWave}
                 onClick={session.startFirstWave}
                 style={startButtonStyle(session.canStartFirstWave)}
@@ -171,13 +172,14 @@ export default function GamePage() {
               <span style={{ opacity: 0.8 }}>盤面へドラッグして配置</span>
               <div style={{ display: "flex", gap: 10 }}>
                 <button
+                  className="press-btn"
                   onClick={session.reroll}
                   disabled={snapshot.coins < snapshot.rerollCost}
                   style={rerollButtonStyle(snapshot.coins >= snapshot.rerollCost)}
                 >
                   更新 ({snapshot.rerollCost})
                 </button>
-                <button onClick={session.nextWave} style={startButtonStyle(true)}>
+                <button className="press-btn" onClick={session.nextWave} style={startButtonStyle(true)}>
                   次のウェーブへ
                 </button>
               </div>
@@ -208,10 +210,10 @@ export default function GamePage() {
             <p style={{ marginBottom: 20, fontSize: 20 }}>撃破数: {snapshot.killCount}</p>
             <ScoreSubmitForm killCount={snapshot.killCount} waveReached={snapshot.wave} />
             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-              <Link href="/" style={secondaryButtonStyle(true)}>
+              <Link className="press-btn" href="/" style={secondaryButtonStyle(true)}>
                 タイトルへ
               </Link>
-              <Link href="/ranking" style={startButtonStyle(true)}>
+              <Link className="press-btn" href="/ranking" style={startButtonStyle(true)}>
                 ランキングへ
               </Link>
             </div>
@@ -264,6 +266,7 @@ function ScoreSubmitForm({ killCount, waveReached }: { killCount: number; waveRe
           }}
         />
         <button
+          className="press-btn"
           onClick={submit}
           disabled={!name.trim() || status === "submitting"}
           style={rerollButtonStyle(!!name.trim() && status !== "submitting")}

@@ -1311,12 +1311,17 @@ export default function GameCanvas({ session }: Props) {
 
       const monsterViews = new Map<string, MonsterView>();
       const enemyViews = new Map<string, EnemyView>();
-      let trayViews: {
+      interface TrayView {
         container: Container;
         spriteContainer: Container;
         item: TrayItem;
         homePx: { x: number; y: number };
-      }[] = [];
+      }
+      // Keyed by offerId (not a flat array) so `syncTray` can tell a
+      // genuinely new candidate apart from one that's merely being
+      // repositioned — see the comment on the drop-in tween inside
+      // `syncTray` for why that distinction matters.
+      const trayViews = new Map<string, TrayView>();
       let drag: DragState | null = null;
       let draggingInstanceId: string | null = null;
       let renderedTrayKey = "";
@@ -1340,7 +1345,7 @@ export default function GameCanvas({ session }: Props) {
         const dy0 = dragged.container.y;
         const dx1 = dx0 + w;
         const dy1 = dy0 + h;
-        for (const view of trayViews) {
+        for (const view of trayViews.values()) {
           if (view.item.offerId === excludeOfferId) continue;
           const { w: vw, h: vh } = shapeSizePx(view.item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
           const sx0 = view.homePx.x - 3;
@@ -1640,17 +1645,12 @@ export default function GameCanvas({ session }: Props) {
         if (key === renderedTrayKey) return;
         renderedTrayKey = key;
 
-        for (const v of trayViews) {
-          trayLayer.removeChild(v.container);
-          traySpriteLayer.removeChild(v.spriteContainer);
-        }
-        traySlotLayer.removeChildren();
-        trayViews = [];
-
         const { positions, frameHeight } = computeTrayLayout(tray);
-        // During battle the tray is empty (nothing to place) — skip
-        // drawing the frame box itself too, not just its (absent) items,
-        // so no empty candidate-tray outline lingers on screen mid-battle.
+        // The frame box is the one piece redrawn unconditionally (cheap,
+        // and its height must track whichever items exist right now) —
+        // During battle the tray is empty (nothing to place), so it's
+        // skipped entirely rather than leaving an empty outline on screen.
+        traySlotLayer.removeChildren();
         if (tray.length > 0) traySlotLayer.addChild(drawTrayFrame(frameHeight));
 
         // New candidates fall in from just above the canvas's top edge,
@@ -1660,9 +1660,24 @@ export default function GameCanvas({ session }: Props) {
         // cascade instead of every item dropping the same short distance.
         const TRAY_DROP_FROM_Y = -40;
 
+        const seen = new Set<string>();
         tray.forEach((item, index) => {
+          seen.add(item.offerId);
           const { w, h } = shapeSizePx(item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
           const homePx = positions.get(item.offerId)!;
+
+          // A candidate already on screen (this offerId survived from the
+          // previous sync) just slides to wherever a removed/added sibling
+          // pushed it — it must NOT replay the drop-in, or every drag/merge
+          // that changes the tray's composition would make the *whole*
+          // tray fall from the top again ("操作して動かすごとにその演出
+          // が入る"), not just whatever's actually new.
+          const existing = trayViews.get(item.offerId);
+          if (existing) {
+            existing.homePx = homePx;
+            gsap.to(existing.container, { x: homePx.x, y: homePx.y, duration: 0.25, ease: "power2.out" });
+            return;
+          }
 
           const species = getSpecies(item.speciesId);
           const container = new Container();
@@ -1705,18 +1720,30 @@ export default function GameCanvas({ session }: Props) {
           container.hitArea = new Rectangle(0, 0, w, h);
           container.eventMode = "static";
           container.cursor = "grab";
+          const view: TrayView = { container, spriteContainer, item, homePx };
           container.on("pointerdown", (e: FederatedPointerEvent) => {
-            beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: homePx });
+            // Reads `view.homePx` (not the `homePx` local) so a drag begun
+            // after this candidate has since been repositioned still snaps
+            // back to its current slot, not the one it was created at.
+            beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: view.homePx });
           });
           spriteContainer.position.set(homePx.x, TRAY_DROP_FROM_Y);
           trayLayer.addChild(container);
           traySpriteLayer.addChild(spriteContainer);
-          trayViews.push({ container, spriteContainer, item, homePx });
+          trayViews.set(item.offerId, view);
           // `spriteContainer` isn't animated directly — the per-frame
           // `v.spriteContainer.position.copyFrom(v.container.position)` in
           // the main tick loop mirrors this tween onto it automatically.
           gsap.to(container, { y: homePx.y, duration: 0.5, delay: index * 0.08, ease: "back.out(1.6)" });
         });
+
+        for (const [offerId, view] of trayViews) {
+          if (!seen.has(offerId)) {
+            trayLayer.removeChild(view.container);
+            traySpriteLayer.removeChild(view.spriteContainer);
+            trayViews.delete(offerId);
+          }
+        }
       }
 
       // PixiJS's Ticker re-schedules its own next requestAnimationFrame at
@@ -1793,7 +1820,7 @@ export default function GameCanvas({ session }: Props) {
         // frame so the split stays invisible across drag, snap-back tweens,
         // and merges, the same way MonsterView.syncPosition() does for
         // board monsters.
-        for (const v of trayViews) v.spriteContainer.position.copyFrom(v.container.position);
+        for (const v of trayViews.values()) v.spriteContainer.position.copyFrom(v.container.position);
       }
     })();
 
