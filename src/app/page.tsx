@@ -1,21 +1,6 @@
-import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
-
-/** Small 4-pointed sparkle, flanking the logo — echoes the ☆ tile motif and
- * the merge-glow effect's gold sparkle particles (`GameCanvas.tsx`'s
- * `spawnMergeGlow`), tying the title screen to the game's own visual language. */
-function Sparkle({ size, delay }: { size: number; delay: number }) {
-  const style: CSSProperties = {
-    width: size,
-    height: size,
-    background: "linear-gradient(135deg, #fff3c4, #ffd24d)",
-    clipPath: "polygon(50% 0%, 61% 35%, 100% 50%, 61% 65%, 50% 100%, 39% 65%, 0% 50%, 39% 35%)",
-    animation: `title-twinkle 2.4s ease-in-out ${delay}s infinite`,
-    flexShrink: 0,
-  };
-  return <div style={style} />;
-}
 
 export default function TitlePage() {
   return (
@@ -40,9 +25,14 @@ export default function TitlePage() {
     >
       <div>
         <div className="title-logo-row">
-          <Sparkle size={16} delay={0} />
-          <h1 className="title-logo-text">がったいモンスターズ</h1>
-          <Sparkle size={16} delay={1.2} />
+          <Image
+            src="/assets/title-logo.png"
+            alt="がったいモンスターズ"
+            width={1536}
+            height={1024}
+            priority
+            style={{ width: "min(85vw, 440px)", height: "auto" }}
+          />
         </div>
         <p style={{ opacity: 0.75, fontSize: "0.95rem", marginTop: 16 }}>
           4×4の盤面にモンスターを配置・合体させて、押し寄せる敵を迎え撃とう

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DotGothic16, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import PwaRegister from "@/components/PwaRegister";
 import "./globals.css";
 
@@ -11,15 +11,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
-
-/** Japanese dot-matrix pixel font, used for the game's logo/title lettering
- * (title screen `<h1>`) — everywhere else keeps the default sans body font. */
-const dotGothic16 = DotGothic16({
-  variable: "--font-dot-gothic",
-  weight: "400",
-  subsets: ["latin"],
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -44,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${geistSans.variable} ${geistMono.variable} ${dotGothic16.variable}`}>
+    <html lang="ja" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning>
         <PwaRegister />
         {children}
