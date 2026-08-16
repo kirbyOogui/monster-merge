@@ -93,20 +93,26 @@ export default function GamePage() {
         padding: 8,
         // The actual game (Pixi canvas) is a fixed CANVAS_W-wide portrait
         // strip, so on any screen wider than that there's open space on
-        // both sides — repeating the same forest art here as a page
-        // background (independent from the identical art `GameCanvas`
-        // draws inside the canvas itself) extends the scene out to the
-        // browser's real edges instead of leaving flat color bars
-        // ("背景画像横の端まで広げたい"). A fixed tile size close to the
-        // art's native 372px width (rather than `cover`, which would blow
-        // it up to the full viewport size — many times its native
-        // resolution on a wide desktop window, well past where pixel art
-        // stays crisp) keeps the pixel density consistent with how it
-        // reads inside the canvas.
+        // both sides — the same forest art used here as a page background
+        // (independent from the identical art `GameCanvas` draws inside
+        // the canvas itself) extends the scene out to the browser's real
+        // edges instead of leaving flat color bars
+        // ("背景画像横の端まで広げたい"). Originally this repeated the art
+        // at near-native size instead of using `cover`, to avoid
+        // upscaling blur — but the tiling seams bothered the user more
+        // than the blur would, and re-generating a dedicated wider image
+        // for this repeatedly produced a wrong, off-center road width (an
+        // AI-generation reliability problem, not a code one — see
+        // [[project_monster_merge_game]]) despite explicit prompting, so a
+        // *new* image wasn't a safe option. `cover` + one instance of the
+        // exact same already-verified-correct 372×500 art (its road really
+        // is centered at 50% width — confirmed by measuring pixel
+        // brightness across the image) sidesteps needing a new generation
+        // at all: no seams, and the road width is guaranteed right.
         backgroundImage: "url(/assets/backgrounds/forest_battlefield.png)",
-        backgroundSize: "400px auto",
+        backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundRepeat: "repeat",
+        backgroundRepeat: "no-repeat",
       }}
     >
       <div
