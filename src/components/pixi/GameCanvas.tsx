@@ -1501,8 +1501,13 @@ export default function GameCanvas({ session }: Props) {
         for (const m of board) {
           seen.add(m.instanceId);
           let view = monsterViews.get(m.instanceId);
+          const isNewView = !view;
           if (!view) {
             view = new MonsterView(m, textures, speciesAnim);
+            // Starts invisible/shrunk so the very first frame it exists
+            // in never flashes at full size before the pop-in tween below
+            // has a chance to run.
+            view.container.scale.set(0, 0);
             monsterViews.set(m.instanceId, view);
             monsterLayer.addChild(view.container);
             monsterSpriteLayer.addChild(view.spriteContainer);
@@ -1520,6 +1525,12 @@ export default function GameCanvas({ session }: Props) {
           if (m.instanceId !== draggingInstanceId) {
             const { x, y } = cellTopLeft(m.anchor);
             view.container.position.set(x, y);
+            // A newly-placed (from the tray) or newly-merged monster pops
+            // onto the board instead of just appearing — mirrors the
+            // level-up bounce below (`back.out`) for the same "juice".
+            if (isNewView) {
+              gsap.fromTo(view.container.scale, { x: 0, y: 0 }, { x: 1, y: 1, duration: 0.3, ease: "back.out(2)" });
+            }
             // Sprites now render larger than their tile and spill upward
             // (see MONSTER_SIZE_BOOST), so a monster can visually overlap
             // the row behind it — sort by row so the one whose feet are
@@ -1547,6 +1558,13 @@ export default function GameCanvas({ session }: Props) {
             view = new EnemyView(e, enemyTextures, enemyAnim);
             enemyViews.set(e.instanceId, view);
             enemyLayer.addChild(view.container);
+            // Materializes in rather than snapping to full visibility the
+            // instant it spawns — pairs with the fade-out `killPop` already
+            // does on the other end of an enemy's life.
+            view.container.alpha = 0;
+            view.container.scale.set(0.6, 0.6);
+            gsap.to(view.container, { alpha: 1, duration: 0.35, ease: "power1.out" });
+            gsap.to(view.container.scale, { x: 1, y: 1, duration: 0.35, ease: "back.out(1.6)" });
           }
           view.update(e);
         }
@@ -1635,7 +1653,14 @@ export default function GameCanvas({ session }: Props) {
         // so no empty candidate-tray outline lingers on screen mid-battle.
         if (tray.length > 0) traySlotLayer.addChild(drawTrayFrame(frameHeight));
 
-        for (const item of tray) {
+        // New candidates fall in from just above the canvas's top edge,
+        // staggered per item ("上から降ってくるように") — one shared
+        // off-screen origin rather than a per-item offset, so a wrapped
+        // second row falls further and the whole tray reads as one
+        // cascade instead of every item dropping the same short distance.
+        const TRAY_DROP_FROM_Y = -40;
+
+        tray.forEach((item, index) => {
           const { w, h } = shapeSizePx(item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
           const homePx = positions.get(item.offerId)!;
 
@@ -1672,7 +1697,7 @@ export default function GameCanvas({ session }: Props) {
           });
           nameLabel.position.set(0, h + 2);
           container.addChild(nameLabel);
-          container.position.set(homePx.x, homePx.y);
+          container.position.set(homePx.x, TRAY_DROP_FROM_Y);
           // Kept to the tile footprint, not the boosted sprite's full
           // bounds — see the matching note on MonsterView.updateHitArea
           // for why an expanded hitArea risks stealing clicks from a
@@ -1683,11 +1708,15 @@ export default function GameCanvas({ session }: Props) {
           container.on("pointerdown", (e: FederatedPointerEvent) => {
             beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: homePx });
           });
-          spriteContainer.position.set(homePx.x, homePx.y);
+          spriteContainer.position.set(homePx.x, TRAY_DROP_FROM_Y);
           trayLayer.addChild(container);
           traySpriteLayer.addChild(spriteContainer);
           trayViews.push({ container, spriteContainer, item, homePx });
-        }
+          // `spriteContainer` isn't animated directly — the per-frame
+          // `v.spriteContainer.position.copyFrom(v.container.position)` in
+          // the main tick loop mirrors this tween onto it automatically.
+          gsap.to(container, { y: homePx.y, duration: 0.5, delay: index * 0.08, ease: "back.out(1.6)" });
+        });
       }
 
       // PixiJS's Ticker re-schedules its own next requestAnimationFrame at
