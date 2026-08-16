@@ -19,7 +19,7 @@ import { clampAnchor, tryMergeTrayItems, type TrayItem } from "@/game/session";
 import { MONSTER_SPECIES, getSpecies } from "@/game/monsters";
 import { ENEMY_DEFS, ENEMY_IDS } from "@/game/enemies";
 import { canPlace, findMonsterAtCell } from "@/game/board";
-import { canMerge } from "@/game/merge";
+import { canMerge, maxLevelForSpecies } from "@/game/merge";
 import { SHAPES, occupiedCells, shapeExtent } from "@/game/shapes";
 import type { EnemyInstance, PlacedMonster, ShapeId, Vec2 } from "@/game/types";
 import {
@@ -29,8 +29,6 @@ import {
   CANVAS_H,
   CANVAS_W,
   CELL,
-  LANE_PX,
-  LANE_X,
   TRAY_CELL,
   TRAY_FRAME_W,
   TRAY_ITEM_GAP,
@@ -95,12 +93,6 @@ const ENEMY_SPRITE_PATHS: Record<string, string> = Object.fromEntries(
 );
 const ENEMY_DEFAULT_FRAME_COUNT = 5;
 
-/** Painted forest-clearing scene (PixelLab, "Create S-XL image (new)")
- * replacing the original placeholder background of flat rectangles/
- * triangle "trees" (see `drawBackground` below, kept as a fallback for
- * if this 404s). Not sized to CANVAS_W/CANVAS_H exactly — see
- * `buildBackgroundSprite`, which cover-scales and center-crops it. */
-const BACKGROUND_SPRITE_PATH = "/assets/backgrounds/forest_battlefield.png";
 /** slime's redesign (rounder, warmer-faced — see the `sizeScale` comment
  * on `EnemyDef`) landed with 9 frames per animation instead of the usual
  * 5, since its Frame Count slider wouldn't respond to keyboard input
@@ -126,14 +118,19 @@ interface EnemyAnim {
   attack: Texture[];
 }
 
-/** Real sprite art, keyed `${speciesId}_lv${level}`. Lv1-Lv4 exist now
- * (Phase6 complete); species/levels with no matching PNG on disk simply 404
- * (caught below during load) and fall back to the procedural `drawBody`
- * placeholder. */
-const SPRITE_LEVELS = [1, 2, 3, 4] as const;
+/** Real sprite art, keyed `${speciesId}_lv${level}`. Lv1-Lv4 exist for every
+ * species; Lv5 only exists for non-1x1 species (sparkit caps at Lv4 — see
+ * `maxLevelForSpecies`), so the level list is capped per-species instead of
+ * blindly requesting a `sparkit_lv5.png` that will never exist. Any
+ * species/level still missing its PNG on disk simply 404s (caught below
+ * during load) and falls back to the procedural `drawBody` placeholder. */
+const SPRITE_LEVELS = [1, 2, 3, 4, 5] as const;
 const SPECIES_SPRITE_PATHS: Record<string, string> = Object.fromEntries(
   MONSTER_SPECIES.flatMap((s) =>
-    SPRITE_LEVELS.map((lv) => [`${s.id}_lv${lv}`, `/assets/monsters/${s.id}_lv${lv}.png`]),
+    SPRITE_LEVELS.filter((lv) => lv <= maxLevelForSpecies(s.id)).map((lv) => [
+      `${s.id}_lv${lv}`,
+      `/assets/monsters/${s.id}_lv${lv}.png`,
+    ]),
   ),
 );
 
@@ -185,8 +182,8 @@ interface SpeciesAnim {
  * set on disk get an entry — anything missing simply 404s (caught below
  * during load) and that species/level falls back to the static sprite
  * with no animation. */
-/** Frame count per level/kind. Lv4's attack was generated via Custom
- * Animation V3 on an enlarged 172×172 canvas (vs. the 132×132 used for
+/** Frame count per level/kind. Lv4 and Lv5's attacks were both generated via
+ * Custom Animation V3 on an enlarged 172×172 canvas (vs. the 132×132 used for
  * everything else) — PixelLab's own in-app guidance steers Pro-model
  * requests back to V3 ("usually produces better results and costs less"),
  * and V3 still supports up to 16 frames on the larger canvas, so the extra
@@ -195,6 +192,7 @@ interface SpeciesAnim {
 const DEFAULT_FRAME_COUNT = 5;
 const FRAME_COUNT_OVERRIDES: Partial<Record<number, Partial<Record<"idle" | "attack", number>>>> = {
   4: { attack: 9 },
+  5: { attack: 9 },
 };
 /** bouldros_lv4's idle came out at 9 frames instead of the usual 5 — its
  * frame-count slider wouldn't respond to keyboard input during generation
@@ -205,7 +203,7 @@ const FRAME_COUNT_OVERRIDES: Partial<Record<number, Partial<Record<"idle" | "att
 const SPECIES_FRAME_COUNT_OVERRIDES: Partial<Record<string, Partial<Record<"idle" | "attack", number>>>> = {
   bouldros_lv4: { idle: 9 },
 };
-const ANIM_LEVELS = [1, 2, 3, 4] as const;
+const ANIM_LEVELS = [1, 2, 3, 4, 5] as const;
 function animFramePaths(speciesId: string, level: number, kind: "idle" | "attack"): string[] {
   const prefix = level === 1 ? `${speciesId}_${kind}` : `${speciesId}_lv${level}_${kind}`;
   const count =
@@ -290,20 +288,32 @@ function createMonsterSprite(
  * frame around the tile itself carries the "this leveled up" signal so it
  * reads clearly even when the artwork alone doesn't ("枠内で見た目変わる
  * ように"). Level 1 stays the plain near-black outline (baseline/no tier
- * yet); level 4 (max) gets the boldest treatment. */
+ * yet); bronze→silver→gold progress through 2-4. Level 5 (the new
+ * evolution-line final form, non-1x1 species only) reads as a tier past
+ * gold — a vivid mythic magenta/violet instead of another metal — so it's
+ * unmistakably the top of the ladder even at a glance. */
 const LEVEL_BORDER_STYLE: Record<number, { stroke: number; glow: number | null }> = {
   1: { stroke: 0x0b1118, glow: null },
   2: { stroke: 0xcd7f32, glow: 0xcd7f32 },
   3: { stroke: 0xe0e0e0, glow: 0xe0e0e0 },
   4: { stroke: 0xffd24d, glow: 0xffd24d },
+  5: { stroke: 0xff2df5, glow: 0xff2df5 },
 };
+
+/** 1x1 (sparkit) has no Lv5 evolution, so its Lv4 *is* its true max — the
+ * level badge reads "LvMAX" there instead of "Lv4" so it doesn't look like
+ * an arbitrary stop partway up the same ladder every other shape climbs to
+ * Lv5 ("1×1のモンスターはレベル４になったらLvMAX表記になるように"). */
+function levelLabelText(shape: ShapeId, level: number): string {
+  return shape === "1x1" && level >= 4 ? "LvMAX" : `Lv${level}`;
+}
 
 function drawBody(g: Graphics, shape: ShapeId, color: number, cellSize: number, margin: number, alpha = 1, level = 1) {
   g.clear();
   const tile = cellSize - margin;
   const radius = Math.max(2, tile * 0.14);
   const style = LEVEL_BORDER_STYLE[level] ?? LEVEL_BORDER_STYLE[1];
-  const strokeWidth = Math.max(1, tile * (level >= 2 ? 0.07 : 0.035));
+  const strokeWidth = Math.max(1, tile * (level >= 5 ? 0.09 : level >= 2 ? 0.07 : 0.035));
   if (style.glow !== null) {
     const glowPad = tile * 0.1;
     for (const cell of SHAPES[shape].cells) {
@@ -377,7 +387,7 @@ class MonsterView {
     this.container.addChild(this.visual);
     this.renderBody(textures, anim);
     this.label = new Text({
-      text: `Lv${m.level}`,
+      text: levelLabelText(m.shape, m.level),
       style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" },
     });
     this.label.position.set(6, 4);
@@ -469,7 +479,7 @@ class MonsterView {
     if (m.level !== this.level) {
       this.level = m.level;
       this.renderBody(textures, anim);
-      this.label.text = `Lv${m.level}`;
+      this.label.text = levelLabelText(m.shape, m.level);
       gsap.fromTo(this.container.scale, { x: 1.25, y: 1.25 }, { x: 1, y: 1, duration: 0.25, ease: "back.out(2)" });
     }
   }
@@ -664,47 +674,6 @@ class EnemyView {
   }
 }
 
-/** Cover-scales `BACKGROUND_SPRITE_PATH`'s painted forest scene to fill
- * the canvas exactly (like CSS `background-size: cover`) — the source
- * art's aspect ratio doesn't exactly match CANVAS_W:CANVAS_H, so this
- * scales up by whichever axis needs it more and center-crops the other,
- * rather than stretching (distorted) or fitting (letterboxed) it. */
-function buildBackgroundSprite(texture: Texture): Sprite {
-  const sprite = new Sprite(texture);
-  const scale = Math.max(CANVAS_W / texture.width, CANVAS_H / texture.height);
-  sprite.width = texture.width * scale;
-  sprite.height = texture.height * scale;
-  sprite.position.set((CANVAS_W - sprite.width) / 2, (CANVAS_H - sprite.height) / 2);
-  return sprite;
-}
-
-/** Fallback backdrop — flat rectangles/triangle "trees" — used only if
- * `BACKGROUND_SPRITE_PATH` fails to load (see `buildBackgroundSprite`
- * for the real art normally shown instead). */
-function drawBackground(): Graphics {
-  const g = new Graphics();
-  g.rect(0, 0, CANVAS_W, CANVAS_H).fill(0x1c3a24);
-
-  const pathX0 = LANE_X;
-  const pathX1 = LANE_X + LANE_PX;
-  g.moveTo(pathX0, 0).lineTo(pathX1, 0).lineTo(pathX1, CANVAS_H).lineTo(pathX0, CANVAS_H).fill({
-    color: 0x6b5638,
-    alpha: 0.55,
-  });
-
-  const tree = (tx: number, ty: number, s: number) => {
-    g.poly([tx, ty - s, tx - s * 0.8, ty + s * 0.6, tx + s * 0.8, ty + s * 0.6]).fill(0x24522c);
-    g.rect(tx - s * 0.12, ty + s * 0.5, s * 0.24, s * 0.35).fill(0x4a3524);
-  };
-  const treeXs = [pathX0 - 14, pathX0 - 4, pathX1 + 4, pathX1 + 14];
-  for (let i = 0; i < 10; i++) {
-    const x = treeXs[i % treeXs.length];
-    const y = 30 + i * (CANVAS_H / 10) + (i % 2 === 0 ? 10 : 40);
-    tree(x, y % CANVAS_H, 16 + (i % 3) * 4);
-  }
-  return g;
-}
-
 function drawStaticBoard(stage: Container) {
   const g = new Graphics();
   g.rect(BOARD_X - 4, BOARD_Y - 4, BOARD_PX + 8, BOARD_PX + 8).fill({ color: 0x0b1118, alpha: 0.55 });
@@ -787,7 +756,12 @@ export default function GameCanvas({ session }: Props) {
       await app.init({
         width: CANVAS_W,
         height: CANVAS_H,
-        backgroundColor: 0x0e1720,
+        // Transparent — the forest scene is now rendered exactly once, as a
+        // single CSS page background behind everything (see page.tsx), so
+        // it shows through here with no second, differently-scaled copy of
+        // the same art meeting it at the canvas edges ("継ぎ目"/seam
+        // between two independent renderings of the same source image).
+        backgroundAlpha: 0,
         antialias: true,
       });
       // Init is async — React StrictMode (or a fast unmount) can request
@@ -799,13 +773,6 @@ export default function GameCanvas({ session }: Props) {
         return;
       }
       containerRef.current?.appendChild(app.canvas);
-
-      let backgroundTexture: Texture | null = null;
-      try {
-        backgroundTexture = await Assets.load(BACKGROUND_SPRITE_PATH);
-      } catch (err) {
-        console.warn(`Failed to load background sprite: ${BACKGROUND_SPRITE_PATH}`, err);
-      }
 
       const textures = new Map<string, Texture>();
       await Promise.all(
@@ -820,7 +787,7 @@ export default function GameCanvas({ session }: Props) {
       const speciesAnim = new Map<string, SpeciesAnim>();
       await Promise.all(
         MONSTER_SPECIES.flatMap((s) =>
-          ANIM_LEVELS.map(async (lv) => {
+          ANIM_LEVELS.filter((lv) => lv <= maxLevelForSpecies(s.id)).map(async (lv) => {
             try {
               const idle = await Promise.all(animFramePaths(s.id, lv, "idle").map((url) => Assets.load(url)));
               const attack = await Promise.all(animFramePaths(s.id, lv, "attack").map((url) => Assets.load(url)));
@@ -858,7 +825,6 @@ export default function GameCanvas({ session }: Props) {
         return;
       }
 
-      app.stage.addChild(backgroundTexture ? buildBackgroundSprite(backgroundTexture) : drawBackground());
       drawStaticBoard(app.stage);
       const traySlotLayer = new Container();
       const monsterLayer = new Container();
@@ -1647,7 +1613,7 @@ export default function GameCanvas({ session }: Props) {
             spriteContainer.addChild(sprite);
           }
           const label = new Text({
-            text: `Lv${item.level}`,
+            text: levelLabelText(item.shape, item.level),
             style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" },
           });
           label.position.set(2, 1);

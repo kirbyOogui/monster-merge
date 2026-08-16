@@ -30,7 +30,7 @@ export interface MonsterSpecies {
   color: number;
 }
 
-export type Level = 1 | 2 | 3 | 4;
+export type Level = 1 | 2 | 3 | 4 | 5;
 
 export interface PlacedMonster {
   instanceId: string;

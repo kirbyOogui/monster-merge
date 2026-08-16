@@ -92,12 +92,19 @@ export const SHAPE_COMBAT: Record<ShapeId, ShapeCombatStats> = {
  * user's request ("味方のレベル４をもっと強力にして") to make that
  * investment pay off much more dramatically. Later dialed back a notch
  * (7.0 attack / 0.65 interval → 6.0 / 0.7) after the user found Lv4
- * overtuned — still a clear jump above Lv3, just less of a DPS cliff. */
+ * overtuned — still a clear jump above Lv3, just less of a DPS cliff.
+ * Lv5 (16 Lv1-equivalents of investment, only for non-1x1 shapes — see
+ * `maxLevelForSpecies` in merge.ts) is this evolution line's true final
+ * form, so it widens the gap again rather than settling into a smaller
+ * arithmetic step, per the user's request for a Lv4-caliber effort that
+ * reads as clearly "cooler"/stronger than Lv4 ("レベル４同様力を入れて
+ * ...よりかっこよく"). */
 const LEVEL_ATTACK_MULTIPLIER: Record<Level, number> = {
   1: 1,
   2: 1.8,
   3: 3.0,
   4: 6.0,
+  5: 10.0,
 };
 
 /** Attack interval shrinks (faster hands) as level rises. */
@@ -106,6 +113,7 @@ const LEVEL_INTERVAL_MULTIPLIER: Record<Level, number> = {
   2: 0.92,
   3: 0.84,
   4: 0.7,
+  5: 0.58,
 };
 
 export function shapeExtent(shape: ShapeId): { rows: number; cols: number } {
@@ -131,7 +139,7 @@ export function resolveMonsterStats(
   const maxTargets =
     base.rangeType === "single"
       ? 1
-      : base.baseMaxTargets + (level >= 3 ? 1 : 0);
+      : base.baseMaxTargets + (level >= 3 ? 1 : 0) + (level >= 5 ? 1 : 0);
   return {
     attack: Math.round(base.baseAttack * LEVEL_ATTACK_MULTIPLIER[level]),
     attackIntervalMs: Math.round(

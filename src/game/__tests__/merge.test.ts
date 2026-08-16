@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMerge, MAX_LEVEL, tryMerge } from "../merge";
+import { canMerge, maxLevelForSpecies, tryMerge } from "../merge";
 import type { PlacedMonster } from "../types";
 
 function monster(overrides: Partial<PlacedMonster> = {}): PlacedMonster {
@@ -37,9 +37,25 @@ describe("canMerge", () => {
     expect(canMerge(a, a)).toBe(false);
   });
 
-  it("rejects merging at max level", () => {
-    const a = monster({ instanceId: "a", level: MAX_LEVEL });
-    const b = monster({ instanceId: "b", level: MAX_LEVEL });
+  it("rejects merging at max level (1x1 caps at Lv4)", () => {
+    const a = monster({ instanceId: "a", level: maxLevelForSpecies("sparkit") });
+    const b = monster({ instanceId: "b", level: maxLevelForSpecies("sparkit") });
+    expect(canMerge(a, b)).toBe(false);
+  });
+
+  it("allows non-1x1 shapes to merge up to Lv5", () => {
+    const ridgeback = (overrides: Partial<PlacedMonster>) =>
+      monster({ speciesId: "ridgeback", shape: "h2", ...overrides });
+    const a = ridgeback({ instanceId: "a", level: 4 });
+    const b = ridgeback({ instanceId: "b", level: 4 });
+    expect(canMerge(a, b)).toBe(true);
+  });
+
+  it("rejects merging non-1x1 shapes at their Lv5 cap", () => {
+    const ridgeback = (overrides: Partial<PlacedMonster>) =>
+      monster({ speciesId: "ridgeback", shape: "h2", ...overrides });
+    const a = ridgeback({ instanceId: "a", level: maxLevelForSpecies("ridgeback") });
+    const b = ridgeback({ instanceId: "b", level: maxLevelForSpecies("ridgeback") });
     expect(canMerge(a, b)).toBe(false);
   });
 });

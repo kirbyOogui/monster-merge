@@ -93,22 +93,18 @@ export default function GamePage() {
         padding: 8,
         // The actual game (Pixi canvas) is a fixed CANVAS_W-wide portrait
         // strip, so on any screen wider than that there's open space on
-        // both sides — the same forest art used here as a page background
-        // (independent from the identical art `GameCanvas` draws inside
-        // the canvas itself) extends the scene out to the browser's real
-        // edges instead of leaving flat color bars
-        // ("背景画像横の端まで広げたい"). Originally this repeated the art
-        // at near-native size instead of using `cover`, to avoid
-        // upscaling blur — but the tiling seams bothered the user more
-        // than the blur would, and re-generating a dedicated wider image
-        // for this repeatedly produced a wrong, off-center road width (an
-        // AI-generation reliability problem, not a code one — see
-        // [[project_monster_merge_game]]) despite explicit prompting, so a
-        // *new* image wasn't a safe option. `cover` + one instance of the
-        // exact same already-verified-correct 372×500 art (its road really
-        // is centered at 50% width — confirmed by measuring pixel
-        // brightness across the image) sidesteps needing a new generation
-        // at all: no seams, and the road width is guaranteed right.
+        // both sides — this single CSS layer is the *only* place the
+        // forest art is ever rendered on this page. `GameCanvas`'s own Pixi
+        // stage is transparent (`backgroundAlpha: 0`) specifically so this
+        // one image shows straight through it instead of a second,
+        // independently-scaled copy being drawn inside the canvas — two
+        // renderings of the same file at different scales was exactly what
+        // produced a visible seam at the canvas's edges before
+        // ("継ぎ目"). `cover` + `center` also keeps this image's own
+        // horizontal center aligned with the canvas's (both are centered
+        // on the viewport), at the cost of the in-game road appearing
+        // wider than its gameplay lane on very wide screens — an accepted
+        // tradeoff ("拡大することで道幅が大きくなるのは構わない").
         backgroundImage: "url(/assets/backgrounds/forest_battlefield.png)",
         backgroundSize: "cover",
         backgroundPosition: "center",
