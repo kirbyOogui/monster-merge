@@ -60,7 +60,13 @@ export default function GamePage() {
       // portrait-oriented game is almost always height-constrained on a
       // typical wide PC window, so a width cap here just leaves unused
       // space below instead of protecting against real overflow.
-      const availableHeight = window.innerHeight - 16;
+      // The extra 48px (on top of the existing 16px breathing room) is a
+      // safety margin for mobile browser chrome (address bar) — on a phone,
+      // `window.innerHeight` doesn't always leave quite enough real room,
+      // and content that's even slightly too tall gets center-clipped top
+      // and bottom by `<main>`'s `overflow: hidden` ("体力バーがurlの領域
+      // で隠れてしまいます" / "コインと倒した数も見えなかった").
+      const availableHeight = window.innerHeight - 16 - 48;
       const next = availableHeight / minNaturalHeightRef.current;
       setScale(next > 0 ? next : 1);
     }
@@ -81,7 +87,14 @@ export default function GamePage() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        // Top-aligned, not centered: if the content is ever taller than the
+        // real available height (see the mobile safety margin above),
+        // `overflow: hidden` should only ever clip from the bottom. Centered
+        // alignment was clipping symmetrically from *both* edges instead —
+        // cutting into the Wave/coins/kills row at the very top as well as
+        // the HP bar at the bottom on phones ("コインと倒した数も見えな
+        // かった").
+        justifyContent: "flex-start",
         width: "100vw",
         height: "100dvh",
         // No scrolling, by design: the scale is fixed to battle's shorter
@@ -141,8 +154,8 @@ export default function GamePage() {
           </div>
 
           {snapshot.phase === "initial-placement" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4, fontSize: 12 }}>
-              <span style={{ opacity: 0.8 }}>手持ちの3体を盤面にドラッグして配置してください</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
+              <span style={{ opacity: 0.8 }}>3体を盤面へドラッグ</span>
               <button
                 disabled={!session.canStartFirstWave}
                 onClick={session.startFirstWave}
@@ -154,10 +167,8 @@ export default function GamePage() {
           )}
 
           {snapshot.phase === "reward" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4, fontSize: 12 }}>
-              <span style={{ opacity: 0.8 }}>
-                好きな数だけ盤面にドラッグして配置できます。盤面のモンスターを上のトレイへ戻すと候補に並び直します
-              </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
+              <span style={{ opacity: 0.8 }}>盤面へドラッグして配置</span>
               <div style={{ display: "flex", gap: 10 }}>
                 <button
                   onClick={session.reroll}

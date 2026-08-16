@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Application,
   Assets,
@@ -746,6 +746,13 @@ export default function GameCanvas({ session }: Props) {
   useEffect(() => {
     sessionRef.current = session;
   });
+  // Loading all sprite/animation frames (now 5 species up to Lv5, plus
+  // enemies) takes long enough on a first visit that a blank transparent
+  // canvas reads as "stuck", not "starting" — this progress bar fills in
+  // that dead time, especially noticeable on the very first game start
+  // ("特にゲームを始めるとき").
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
 
   useEffect(() => {
     let destroyed = false;
@@ -774,6 +781,24 @@ export default function GameCanvas({ session }: Props) {
       }
       containerRef.current?.appendChild(app.canvas);
 
+      // Coarse-grained progress: one "unit" per static sprite, and one per
+      // idle/attack frame set (not per individual frame file) — precise
+      // enough to make the bar move steadily without threading a counter
+      // through every single `Assets.load` call.
+      const speciesAnimJobs = MONSTER_SPECIES.flatMap((s) =>
+        ANIM_LEVELS.filter((lv) => lv <= maxLevelForSpecies(s.id)).map((lv) => ({ species: s, lv })),
+      );
+      const totalUnits =
+        Object.keys(SPECIES_SPRITE_PATHS).length +
+        speciesAnimJobs.length * 2 +
+        Object.keys(ENEMY_SPRITE_PATHS).length +
+        ENEMY_IDS.length * 2;
+      let loadedUnits = 0;
+      const bump = () => {
+        loadedUnits += 1;
+        setLoadProgress(Math.min(1, loadedUnits / totalUnits));
+      };
+
       const textures = new Map<string, Texture>();
       await Promise.all(
         Object.entries(SPECIES_SPRITE_PATHS).map(async ([key, url]) => {
@@ -781,22 +806,30 @@ export default function GameCanvas({ session }: Props) {
             textures.set(key, await Assets.load(url));
           } catch (err) {
             console.warn(`Failed to load monster sprite: ${url}`, err);
+          } finally {
+            bump();
           }
         }),
       );
       const speciesAnim = new Map<string, SpeciesAnim>();
       await Promise.all(
-        MONSTER_SPECIES.flatMap((s) =>
-          ANIM_LEVELS.filter((lv) => lv <= maxLevelForSpecies(s.id)).map(async (lv) => {
-            try {
-              const idle = await Promise.all(animFramePaths(s.id, lv, "idle").map((url) => Assets.load(url)));
-              const attack = await Promise.all(animFramePaths(s.id, lv, "attack").map((url) => Assets.load(url)));
-              speciesAnim.set(`${s.id}_lv${lv}`, { idle, attack });
-            } catch (err) {
-              console.warn(`Failed to load animation frames for species: ${s.id} lv${lv}`, err);
-            }
-          }),
-        ),
+        speciesAnimJobs.map(async ({ species: s, lv }) => {
+          const idle = await Promise.all(animFramePaths(s.id, lv, "idle").map((url) => Assets.load(url))).catch(
+            (err) => {
+              console.warn(`Failed to load idle frames for species: ${s.id} lv${lv}`, err);
+              return [] as Texture[];
+            },
+          );
+          bump();
+          const attack = await Promise.all(animFramePaths(s.id, lv, "attack").map((url) => Assets.load(url))).catch(
+            (err) => {
+              console.warn(`Failed to load attack frames for species: ${s.id} lv${lv}`, err);
+              return [] as Texture[];
+            },
+          );
+          bump();
+          speciesAnim.set(`${s.id}_lv${lv}`, { idle, attack });
+        }),
       );
       const enemyTextures = new Map<string, Texture>();
       await Promise.all(
@@ -805,25 +838,37 @@ export default function GameCanvas({ session }: Props) {
             enemyTextures.set(key, await Assets.load(url));
           } catch (err) {
             console.warn(`Failed to load enemy sprite: ${url}`, err);
+          } finally {
+            bump();
           }
         }),
       );
       const enemyAnim = new Map<string, EnemyAnim>();
       await Promise.all(
         ENEMY_IDS.map(async (id) => {
-          try {
-            const walk = await Promise.all(enemyAnimFramePaths(id, "walk").map((url) => Assets.load(url)));
-            const attack = await Promise.all(enemyAnimFramePaths(id, "attack").map((url) => Assets.load(url)));
-            enemyAnim.set(id, { walk, attack });
-          } catch (err) {
-            console.warn(`Failed to load animation frames for enemy: ${id}`, err);
-          }
+          const walk = await Promise.all(enemyAnimFramePaths(id, "walk").map((url) => Assets.load(url))).catch(
+            (err) => {
+              console.warn(`Failed to load walk frames for enemy: ${id}`, err);
+              return [] as Texture[];
+            },
+          );
+          bump();
+          const attack = await Promise.all(enemyAnimFramePaths(id, "attack").map((url) => Assets.load(url))).catch(
+            (err) => {
+              console.warn(`Failed to load attack frames for enemy: ${id}`, err);
+              return [] as Texture[];
+            },
+          );
+          bump();
+          enemyAnim.set(id, { walk, attack });
         }),
       );
       if (destroyed) {
         app.destroy(true, { children: true });
         return;
       }
+      setLoadProgress(1);
+      setAssetsLoaded(true);
 
       drawStaticBoard(app.stage);
       const traySlotLayer = new Container();
@@ -1585,7 +1630,10 @@ export default function GameCanvas({ session }: Props) {
         trayViews = [];
 
         const { positions, frameHeight } = computeTrayLayout(tray);
-        traySlotLayer.addChild(drawTrayFrame(frameHeight));
+        // During battle the tray is empty (nothing to place) — skip
+        // drawing the frame box itself too, not just its (absent) items,
+        // so no empty candidate-tray outline lingers on screen mid-battle.
+        if (tray.length > 0) traySlotLayer.addChild(drawTrayFrame(frameHeight));
 
         for (const item of tray) {
           const { w, h } = shapeSizePx(item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
@@ -1731,5 +1779,40 @@ export default function GameCanvas({ session }: Props) {
   // it, a long-press on a monster (to start dragging it) could instead
   // trigger the browser's native text-selection or (on mobile) its
   // copy/share callout, fighting with Pixi's own pointer-based dragging.
-  return <div ref={containerRef} className="inline-block" style={{ touchAction: "none" }} />;
+  // This wrapper is sized to the canvas's own fixed dimensions up front
+  // (rather than only once Pixi appends its canvas inside), so the loading
+  // overlay below has something to sit on top of immediately.
+  return (
+    <div style={{ position: "relative", width: CANVAS_W, height: CANVAS_H }}>
+      <div ref={containerRef} className="inline-block" style={{ touchAction: "none" }} />
+      {!assetsLoaded && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            background: "rgba(14,23,32,0.92)",
+            borderRadius: 16,
+          }}
+        >
+          <span style={{ fontSize: 13, opacity: 0.85 }}>読み込み中...</span>
+          <div style={{ width: 160, height: 8, borderRadius: 999, background: "#2a3d52", overflow: "hidden" }}>
+            <div
+              style={{
+                width: `${Math.round(loadProgress * 100)}%`,
+                height: "100%",
+                background: "var(--accent)",
+                transition: "width 0.15s ease",
+              }}
+            />
+          </div>
+          <span style={{ fontSize: 12, opacity: 0.6 }}>{Math.round(loadProgress * 100)}%</span>
+        </div>
+      )}
+    </div>
+  );
 }
