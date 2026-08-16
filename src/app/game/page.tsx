@@ -91,6 +91,22 @@ export default function GamePage() {
         // of either shrinking the whole layout back down or scrolling.
         overflow: "hidden",
         padding: 8,
+        // The actual game (Pixi canvas) is a fixed CANVAS_W-wide portrait
+        // strip, so on any screen wider than that there's open space on
+        // both sides — repeating the same forest art here as a page
+        // background (independent from the identical art `GameCanvas`
+        // draws inside the canvas itself) extends the scene out to the
+        // browser's real edges instead of leaving flat color bars
+        // ("背景画像横の端まで広げたい"). A fixed tile size close to the
+        // art's native 372px width (rather than `cover`, which would blow
+        // it up to the full viewport size — many times its native
+        // resolution on a wide desktop window, well past where pixel art
+        // stays crisp) keeps the pixel density consistent with how it
+        // reads inside the canvas.
+        backgroundImage: "url(/assets/backgrounds/forest_battlefield.png)",
+        backgroundSize: "400px auto",
+        backgroundPosition: "center",
+        backgroundRepeat: "repeat",
       }}
     >
       <div
