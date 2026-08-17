@@ -1671,12 +1671,24 @@ export default function GameCanvas({ session }: Props) {
           // pushed it — it must NOT replay the drop-in, or every drag/merge
           // that changes the tray's composition would make the *whole*
           // tray fall from the top again ("操作して動かすごとにその演出
-          // が入る"), not just whatever's actually new.
+          // が入る"), not just whatever's actually new. But `tryMergeTrayItems`
+          // merges two candidates by keeping the *target's* offerId and only
+          // bumping its level ("target keeps its offerId/slot") — so an
+          // unchanged offerId doesn't always mean unchanged visuals, and
+          // skipping the rebuild here made a tray merge's level-up silently
+          // not render (art/label stayed on the old level).
           const existing = trayViews.get(item.offerId);
-          if (existing) {
+          const isStaleMergeResult = !!existing && (existing.item.level !== item.level || existing.item.shape !== item.shape);
+          if (existing && !isStaleMergeResult) {
             existing.homePx = homePx;
+            existing.item = item;
             gsap.to(existing.container, { x: homePx.x, y: homePx.y, duration: 0.25, ease: "power2.out" });
             return;
+          }
+          if (existing) {
+            trayLayer.removeChild(existing.container);
+            traySpriteLayer.removeChild(existing.spriteContainer);
+            trayViews.delete(item.offerId);
           }
 
           const species = getSpecies(item.speciesId);
@@ -1712,7 +1724,11 @@ export default function GameCanvas({ session }: Props) {
           });
           nameLabel.position.set(0, h + 2);
           container.addChild(nameLabel);
-          container.position.set(homePx.x, TRAY_DROP_FROM_Y);
+          // A merge result appears in place with a pop (it didn't newly
+          // enter the tray, an existing candidate just leveled up) —
+          // only a genuinely new candidate drops in from off-screen.
+          const startY = isStaleMergeResult ? homePx.y : TRAY_DROP_FROM_Y;
+          container.position.set(homePx.x, startY);
           // Kept to the tile footprint, not the boosted sprite's full
           // bounds — see the matching note on MonsterView.updateHitArea
           // for why an expanded hitArea risks stealing clicks from a
@@ -1727,14 +1743,18 @@ export default function GameCanvas({ session }: Props) {
             // back to its current slot, not the one it was created at.
             beginDrag(e, { kind: "tray", item, shape: item.shape, container, originPx: view.homePx });
           });
-          spriteContainer.position.set(homePx.x, TRAY_DROP_FROM_Y);
+          spriteContainer.position.set(homePx.x, startY);
           trayLayer.addChild(container);
           traySpriteLayer.addChild(spriteContainer);
           trayViews.set(item.offerId, view);
           // `spriteContainer` isn't animated directly — the per-frame
-          // `v.spriteContainer.position.copyFrom(v.container.position)` in
-          // the main tick loop mirrors this tween onto it automatically.
-          gsap.to(container, { y: homePx.y, duration: 0.5, delay: index * 0.08, ease: "back.out(1.6)" });
+          // mirror in the main tick loop copies both this tween and the
+          // pop-in scale below onto it automatically.
+          if (isStaleMergeResult) {
+            gsap.fromTo(container.scale, { x: 0.5, y: 0.5 }, { x: 1, y: 1, duration: 0.25, ease: "back.out(2)" });
+          } else {
+            gsap.to(container, { y: homePx.y, duration: 0.5, delay: index * 0.08, ease: "back.out(1.6)" });
+          }
         });
 
         for (const [offerId, view] of trayViews) {
@@ -1816,11 +1836,15 @@ export default function GameCanvas({ session }: Props) {
 
         syncTray(sessionRef.current.tray);
         // Sprites live in a separate layer from their draggable tile
-        // container (see traySpriteLayer above) — mirror position every
-        // frame so the split stays invisible across drag, snap-back tweens,
-        // and merges, the same way MonsterView.syncPosition() does for
-        // board monsters.
-        for (const v of trayViews.values()) v.spriteContainer.position.copyFrom(v.container.position);
+        // container (see traySpriteLayer above) — mirror position *and*
+        // scale every frame so the split stays invisible across drag,
+        // snap-back tweens, the drop-in fall, and the merge-result pop-in
+        // (which animates `container.scale`), the same way
+        // MonsterView.syncPosition() does for board monsters.
+        for (const v of trayViews.values()) {
+          v.spriteContainer.position.copyFrom(v.container.position);
+          v.spriteContainer.scale.copyFrom(v.container.scale);
+        }
       }
     })();
 
