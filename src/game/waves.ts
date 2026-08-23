@@ -20,6 +20,13 @@ interface WaveConfig {
    * flagship enemy should announce itself with. From the following wave
    * onward it merges into the normal weighted pool like any other unlock. */
   bossDebut?: { enemyId: string; count: number };
+  /** A recurring wave that's *only* this one enemy ("こいつは１ぴきのみで
+   * 出現する") — starting at `startWave`, and every `interval` waves after
+   * that, the entire wave is a single copy of `enemyId` instead of the
+   * usual multi-enemy pool. Unlike `bossDebut`, this enemy id is meant to
+   * be left out of `enemyUnlocks` entirely, so it can *only* ever appear
+   * through this solo path, never mixed into a normal wave. */
+  soloBossWave?: { enemyId: string; startWave: number; interval: number };
 }
 
 const waveConfig = waveConfigJson as WaveConfig;
@@ -55,7 +62,21 @@ export function waveScaling(wave: number) {
   };
 }
 
+function soloBossEnemyId(wave: number): string | null {
+  const cfg = waveConfig.soloBossWave;
+  if (!cfg || wave < cfg.startWave) return null;
+  return (wave - cfg.startWave) % cfg.interval === 0 ? cfg.enemyId : null;
+}
+
 export function generateWave(wave: number, rng: Rng = defaultRng): WaveDefinition {
+  const soloBoss = soloBossEnemyId(wave);
+  if (soloBoss && ENEMY_DEFS[soloBoss]) {
+    // Centered, not scattered — with no other enemies this wave, there's
+    // no crowding to spread out from, and centered reads more like a
+    // single imposing arrival than a normal enemy's random lane position.
+    return { wave, spawns: [{ spawnX: 0.5, enemyId: soloBoss, delayMs: 0 }] };
+  }
+
   const count = enemyCountForWave(wave);
 
   const debut = waveConfig.bossDebut;

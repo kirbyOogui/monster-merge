@@ -107,6 +107,7 @@ const ENEMY_FRAME_COUNT_OVERRIDES: Partial<Record<string, number | Partial<Recor
   slime: 9,
   troll: { walk: 4, attack: 6 },
   giant: { walk: 4, attack: 6 },
+  dragon: { walk: 6, attack: 7 },
 };
 function enemyAnimFramePaths(enemyId: string, kind: "walk" | "attack"): string[] {
   const override = ENEMY_FRAME_COUNT_OVERRIDES[enemyId];

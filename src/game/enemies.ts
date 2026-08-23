@@ -66,6 +66,22 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     coinReward: 25,
     sizeScale: 2.0,
   },
+  /** A dedicated solo-wave boss (see `soloBossWave` in waveConfig.json) —
+   * never joins the normal weighted enemy pool, so it's deliberately left
+   * out of `enemyUnlocks`; its only spawn path is `generateWave`'s
+   * solo-boss branch, which always sends exactly one. Stats are a large
+   * jump over giant (the previous strongest) since this is the whole
+   * wave's threat rather than one of dozens. */
+  dragon: {
+    id: "dragon",
+    name: "ドラゴン",
+    baseHp: 2200,
+    baseSpeed: 0.05,
+    baseDamage: 130,
+    coinDropChance: 1,
+    coinReward: 60,
+    sizeScale: 2.6,
+  },
 };
 
 export const ENEMY_IDS = Object.keys(ENEMY_DEFS);

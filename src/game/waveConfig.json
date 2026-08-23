@@ -14,5 +14,6 @@
     "troll": 8,
     "giant": 9
   },
-  "bossDebut": { "enemyId": "giant", "count": 3 }
+  "bossDebut": { "enemyId": "giant", "count": 3 },
+  "soloBossWave": { "enemyId": "dragon", "startWave": 15, "interval": 10 }
 }

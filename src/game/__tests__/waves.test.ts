@@ -22,4 +22,22 @@ describe("generateWave", () => {
     // Not a guaranteed count anymore — just confirms it's eligible again.
     expect(wave.spawns.some((s) => s.enemyId === "giant")).toBe(true);
   });
+
+  it("makes the solo boss's wave nothing but a single copy of it", () => {
+    const wave = generateWave(15, mulberry32(1));
+    expect(wave.spawns).toHaveLength(1);
+    expect(wave.spawns[0].enemyId).toBe("dragon");
+  });
+
+  it("repeats the solo boss wave every `interval` waves after its start", () => {
+    const wave = generateWave(25, mulberry32(1));
+    expect(wave.spawns).toHaveLength(1);
+    expect(wave.spawns[0].enemyId).toBe("dragon");
+  });
+
+  it("never mixes the solo boss into a normal multi-enemy wave", () => {
+    for (const wave of [14, 16, 20, 24, 26]) {
+      expect(countEnemy(generateWave(wave, mulberry32(1)), "dragon")).toBe(0);
+    }
+  });
 });
