@@ -31,15 +31,22 @@ export default function GamePage() {
   // Wave/coins/kills row) — scoring the scale off whatever height is
   // currently mounted meant the *whole* scaled layout visibly shrank every
   // time a wave ended and the panel grew back
-  // ("ウェーブ間になると画面全体が小さくなってしまう"). Tracking the
-  // smallest natural height ever observed — instead of the current one —
-  // and never growing it back down fixes the game at the larger scale
-  // battle's shorter panel allows, permanently, the first time battle is
-  // reached ("大きい方で固定してほしい"). During initial-placement/reward,
-  // the panel is then occasionally taller than this fixed reference; rather
-  // than shrinking everything to compensate, `overflowY: auto` on `<main>`
-  // (below) lets the user scroll that rare extra bit instead.
-  const minNaturalHeightRef = useRef(Infinity);
+  // ("ウェーブ間になると画面全体が小さくなってしまう"), so this locks
+  // permanently to a single reference height instead of ever recomputing
+  // per-transition. That reference is the *largest* natural height ever
+  // observed (not the smallest) — `<main>` below is `overflow: hidden`
+  // with no scrolling, so anything taller than the locked reference has
+  // nowhere to go and just gets silently clipped off the bottom, which
+  // used to genuinely happen during reward/retry ("ウェーブ間の比率...変
+  // になるかも", "リトライをすると画面比率がおかしくなる" — an earlier
+  // version of this locked to the *smallest* height instead, betting that
+  // battle's shorter panel would always be the one that stuck; retry
+  // going back to a taller "initial-placement" panel after battle had
+  // already locked in the shorter one broke that bet). Locking to the
+  // tallest instead means every phase fits with room to spare, at the
+  // cost of battle not being quite as maximally large as the old
+  // shortest-wins version was.
+  const maxNaturalHeightRef = useRef(0);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -66,14 +73,15 @@ export default function GamePage() {
       // appends the canvas (see GameCanvas.tsx) — so there's a brief
       // window, right after the dynamic import resolves but before that
       // effect finishes, where this container is mounted but collapsed to
-      // near-zero height. Without this guard, that transient reading could
-      // get latched in as the "smallest ever seen" natural height below,
-      // permanently pinning the scale at an enormous, broken value (this
-      // actually happened: "変なところでドアップになって操作不能"). The
-      // canvas itself is always exactly CANVAS_H once mounted, so anything
+      // near-zero height. Without this guard, that transient (near-zero)
+      // reading is harmless to `Math.max` itself, but would otherwise
+      // still trigger a `setScale` call using it as the divisor — briefly
+      // pinning the scale at an enormous, broken value (this actually
+      // happened: "変なところでドアップになって操作不能"). The canvas
+      // itself is always exactly CANVAS_H once mounted, so anything
       // shorter than that is this transitional state, not a real reading.
       if (naturalHeight < CANVAS_H) return;
-      minNaturalHeightRef.current = Math.min(minNaturalHeightRef.current, naturalHeight);
+      maxNaturalHeightRef.current = Math.max(maxNaturalHeightRef.current, naturalHeight);
       // Prioritize filling the full vertical space ("縦いっぱいに使う") — this
       // portrait-oriented game is almost always height-constrained on a
       // typical wide PC window, so a width cap here just leaves unused
@@ -89,7 +97,7 @@ export default function GamePage() {
       // status bar/notch instead of rendering underneath it
       // ("wave表記も時刻とかぶってる" / "５Gや充電マークとかぶってしまう").
       const availableHeight = window.innerHeight - 16 - 48 - safeAreaTop;
-      const next = availableHeight / minNaturalHeightRef.current;
+      const next = availableHeight / maxNaturalHeightRef.current;
       setScale(next > 0 ? next : 1);
     }
 
@@ -119,11 +127,11 @@ export default function GamePage() {
         justifyContent: "flex-start",
         width: "100vw",
         height: "100dvh",
-        // No scrolling, by design: the scale is fixed to battle's shorter
-        // panel height (see `minNaturalHeightRef` above), so
-        // initial-placement/reward's occasionally-taller panel can in rare
-        // cases not fully fit at that size — any excess is clipped instead
-        // of either shrinking the whole layout back down or scrolling.
+        // No scrolling, by design: the scale is locked to the *tallest*
+        // panel variant ever seen (see `maxNaturalHeightRef` above), so
+        // nothing should actually need to clip here in normal use — this
+        // stays `hidden` only as a last-resort safety net, not the
+        // mechanism anything is meant to rely on.
         overflow: "hidden",
         padding: 8,
         // Top padding also reserves the iOS status bar/notch's safe area
@@ -171,11 +179,16 @@ export default function GamePage() {
             aria-label="メニュー"
             style={{
               position: "absolute",
-              // A few px off the very corner (not flush at 0,0) and a
-              // bigger hit target than before ("メニューボタン押しずらい")
-              // — 32px was easy to miss, especially once the whole game
-              // area is scaled down to fit a shorter viewport.
-              top: 4,
+              // A bigger hit target than the original 32px
+              // ("メニューボタン押しずらい"). `top` is a fixed pixel value
+              // (measured against the "ウェーブ開始" button's own position
+              // during initial-placement, in this box's unscaled local
+              // coordinate space) landing just below it — chosen so the
+              // button stays put at that same spot in every phase,
+              // including "battle" once that row disappears entirely
+              // ("ウェーブ間のウエーブ開始ボタンの下くらいにして、始まっ
+              // てもそこ固定で"), rather than tracking the button live.
+              top: 100,
               right: 4,
               zIndex: 20,
               width: 44,
