@@ -48,6 +48,19 @@ export default function GamePage() {
     function updateScale() {
       if (!el) return;
       const naturalHeight = el.scrollHeight;
+      // `env(safe-area-inset-top)` has no direct JS accessor — a
+      // zero-size probe element with that as its padding, measured via
+      // getComputedStyle, is the standard workaround. Needed so the scale
+      // math below accounts for the same inset `<main>`'s own top padding
+      // reserves in CSS (see the `padding` comment further down) —
+      // without it, content sized to fill the *full* viewport height
+      // would overflow past the bottom once that top inset pushes
+      // everything down.
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:fixed;top:0;left:0;height:0;padding-top:env(safe-area-inset-top,0px);";
+      document.body.appendChild(probe);
+      const safeAreaTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+      document.body.removeChild(probe);
       // GameCanvas's own root div starts with no explicit height and only
       // gets its real size once Pixi's async `app.init()` resolves and
       // appends the canvas (see GameCanvas.tsx) — so there's a brief
@@ -70,8 +83,12 @@ export default function GamePage() {
       // `window.innerHeight` doesn't always leave quite enough real room,
       // and content that's even slightly too tall gets center-clipped top
       // and bottom by `<main>`'s `overflow: hidden` ("体力バーがurlの領域
-      // で隠れてしまいます" / "コインと倒した数も見えなかった").
-      const availableHeight = window.innerHeight - 16 - 48;
+      // で隠れてしまいます" / "コインと倒した数も見えなかった"). `safeAreaTop`
+      // is on top of that again — `<main>`'s own top padding reserves that
+      // same inset (see below) so the Wave/menu-button row clears the iOS
+      // status bar/notch instead of rendering underneath it
+      // ("wave表記も時刻とかぶってる" / "５Gや充電マークとかぶってしまう").
+      const availableHeight = window.innerHeight - 16 - 48 - safeAreaTop;
       const next = availableHeight / minNaturalHeightRef.current;
       setScale(next > 0 ? next : 1);
     }
@@ -109,6 +126,11 @@ export default function GamePage() {
         // of either shrinking the whole layout back down or scrolling.
         overflow: "hidden",
         padding: 8,
+        // Top padding also reserves the iOS status bar/notch's safe area
+        // — `viewportFit: "cover"` (see layout.tsx) lets this page's
+        // background extend under it, but actual content (the Wave row,
+        // the menu button) needs to start clear of it, not underneath.
+        paddingTop: "calc(8px + env(safe-area-inset-top, 0px))",
         // The actual game (Pixi canvas) is a fixed CANVAS_W-wide portrait
         // strip, so on any screen wider than that there's open space on
         // both sides — this single CSS layer is the *only* place the
@@ -149,11 +171,15 @@ export default function GamePage() {
             aria-label="メニュー"
             style={{
               position: "absolute",
-              top: 0,
-              right: 0,
+              // A few px off the very corner (not flush at 0,0) and a
+              // bigger hit target than before ("メニューボタン押しずらい")
+              // — 32px was easy to miss, especially once the whole game
+              // area is scaled down to fit a shorter viewport.
+              top: 4,
+              right: 4,
               zIndex: 20,
-              width: 32,
-              height: 32,
+              width: 44,
+              height: 44,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -162,7 +188,7 @@ export default function GamePage() {
               border: "1px solid #2a3d52",
               background: "rgba(20,32,44,0.85)",
               color: "var(--foreground)",
-              fontSize: 16,
+              fontSize: 22,
               lineHeight: 1,
             }}
           >
