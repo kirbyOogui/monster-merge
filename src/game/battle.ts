@@ -33,10 +33,10 @@ const ENEMY_ATTACK_INTERVAL_MS = 1000;
  * enemy has to be solidly, unambiguously on-screen — not merely eligible
  * — before combat DPS (which scales with player progression, not with
  * this constant) can touch it. Later pulled back down from 0.55 to 0.45
- * ("味方の攻撃が通るようになる位置もう少し上でもいいかも"), then another
- * 0.05 to 0.4 ("もう５％上げて") — still at the midpoint, just not
- * past it. */
-const MIN_ATTACKABLE_PROGRESS = 0.4;
+ * ("味方の攻撃が通るようになる位置もう少し上でもいいかも"), then 0.4
+ * ("もう５％上げて"), then settled on 0.25 ("やっぱり25%上に変えて") —
+ * now well before the midpoint. */
+const MIN_ATTACKABLE_PROGRESS = 0.25;
 
 /**
  * How long to linger in "battle" after the last enemy is gone before

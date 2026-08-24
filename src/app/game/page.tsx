@@ -47,14 +47,20 @@ export default function GamePage() {
   // cost of battle not being quite as maximally large as the old
   // shortest-wins version was.
   const maxNaturalHeightRef = useRef(0);
-  // The panel's *own* height reserves the same "tallest ever" amount of
-  // space too — otherwise, even with the scale itself locked (above),
-  // the board/HP bar below the panel would still slide up and down by
-  // however much shorter the current phase's panel happens to be, since
-  // they're just normal-flow siblings under it
+  // An invisible spacer around the panel reserves the same "tallest ever"
+  // amount of space too — otherwise, even with the scale itself locked
+  // (above), the board/HP bar below the panel would still slide up and
+  // down by however much shorter the current phase's panel happens to
+  // be, since they're just normal-flow siblings under it
   // ("体力バーとモンスターの枠も位置固定できない？ウェーブ間の位置を
   // 基準にして" — reward's panel is the tall one, so that's the position
-  // everything else now stays pinned to, in every phase).
+  // everything else now stays pinned to, in every phase). The *visible*
+  // panel box itself (background/border) is deliberately not stretched to
+  // fill that reserved space — it stays sized to whatever's actually in
+  // it, e.g. just the one-line Wave/coins/kills row during battle
+  // ("枠が大きいままになってますが...小さくする"), leaving open
+  // background showing between it and the board rather than resizing the
+  // board to close that gap.
   const panelRef = useRef<HTMLDivElement>(null);
   const maxPanelHeightRef = useRef(0);
   const [panelMinHeight, setPanelMinHeight] = useState(0);
@@ -230,66 +236,79 @@ export default function GamePage() {
         )}
 
         <div
-          ref={panelRef}
           style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            padding: "8px 10px",
-            fontSize: 13,
-            background: "rgba(20,32,44,0.85)",
-            border: "1px solid #2a3d52",
-            borderRadius: 16,
-            marginBottom: 6,
-            // Reserves the tallest-ever-seen panel height (see
-            // `panelMinHeight` above) so the board/HP bar below never
-            // shift position between phases — `border-box` so this
-            // matches the same `scrollHeight` basis (padding/border
-            // included) the measurement itself uses.
+            // Invisible spacer only — reserves the tallest-ever-seen panel
+            // height (see `panelMinHeight` above) so the board/HP bar below
+            // never shift position between phases, without forcing the
+            // *visible* panel box (below) to stay stretched to that same
+            // height. During battle, that leaves empty space between the
+            // now form-fitted 1-line panel and the board — accepted as the
+            // tradeoff for keeping the board pinned ("他の要素はつめたり
+            // せず、そのままの位置になるようにする" / "敵の行動範囲が長く
+            // なるようならそれで大丈夫"). `border-box` matches the same
+            // `scrollHeight` basis the measurement itself uses.
             boxSizing: "border-box",
             minHeight: panelMinHeight || undefined,
+            marginBottom: 6,
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontWeight: 700 }}>Wave {snapshot.wave}</span>
-            <div style={{ display: "flex", gap: 12, opacity: 0.9 }}>
-              <span>🪙 {snapshot.coins}</span>
-              <span>撃破 {snapshot.killCount}</span>
-            </div>
-          </div>
-
-          {snapshot.phase === "initial-placement" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
-              <span style={{ opacity: 0.8 }}>3体を盤面へドラッグ</span>
-              <button
-                className="press-btn"
-                disabled={!session.canStartFirstWave}
-                onClick={session.startFirstWave}
-                style={startButtonStyle(session.canStartFirstWave)}
-              >
-                ウェーブ開始
-              </button>
-            </div>
-          )}
-
-          {snapshot.phase === "reward" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
-              <span style={{ opacity: 0.8 }}>盤面へドラッグして配置</span>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  className="press-btn"
-                  onClick={session.reroll}
-                  disabled={snapshot.coins < snapshot.rerollCost}
-                  style={rerollButtonStyle(snapshot.coins >= snapshot.rerollCost)}
-                >
-                  更新 ({snapshot.rerollCost})
-                </button>
-                <button className="press-btn" onClick={session.nextWave} style={startButtonStyle(true)}>
-                  次のウェーブへ
-                </button>
+          <div
+            ref={panelRef}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              padding: "8px 10px",
+              fontSize: 13,
+              background: "rgba(20,32,44,0.85)",
+              border: "1px solid #2a3d52",
+              borderRadius: 16,
+              // Sized to its own current content only ("枠が大きいまま
+              // になってますが、1行分で足りるので小さくする") — the
+              // wrapper above is what reserves the extra room, not this.
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 700 }}>Wave {snapshot.wave}</span>
+              <div style={{ display: "flex", gap: 12, opacity: 0.9 }}>
+                <span>🪙 {snapshot.coins}</span>
+                <span>撃破 {snapshot.killCount}</span>
               </div>
             </div>
-          )}
+
+            {snapshot.phase === "initial-placement" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
+                <span style={{ opacity: 0.8 }}>3体を盤面へドラッグ</span>
+                <button
+                  className="press-btn"
+                  disabled={!session.canStartFirstWave}
+                  onClick={session.startFirstWave}
+                  style={startButtonStyle(session.canStartFirstWave)}
+                >
+                  ウェーブ開始
+                </button>
+              </div>
+            )}
+
+            {snapshot.phase === "reward" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, fontSize: 12 }}>
+                <span style={{ opacity: 0.8 }}>盤面へドラッグして配置</span>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    className="press-btn"
+                    onClick={session.reroll}
+                    disabled={snapshot.coins < snapshot.rerollCost}
+                    style={rerollButtonStyle(snapshot.coins >= snapshot.rerollCost)}
+                  >
+                    更新 ({snapshot.rerollCost})
+                  </button>
+                  <button className="press-btn" onClick={session.nextWave} style={startButtonStyle(true)}>
+                    次のウェーブへ
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ width: "100%", overflowX: "auto" }}>
