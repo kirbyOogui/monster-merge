@@ -47,6 +47,17 @@ export default function GamePage() {
   // cost of battle not being quite as maximally large as the old
   // shortest-wins version was.
   const maxNaturalHeightRef = useRef(0);
+  // The panel's *own* height reserves the same "tallest ever" amount of
+  // space too — otherwise, even with the scale itself locked (above),
+  // the board/HP bar below the panel would still slide up and down by
+  // however much shorter the current phase's panel happens to be, since
+  // they're just normal-flow siblings under it
+  // ("体力バーとモンスターの枠も位置固定できない？ウェーブ間の位置を
+  // 基準にして" — reward's panel is the tall one, so that's the position
+  // everything else now stays pinned to, in every phase).
+  const panelRef = useRef<HTMLDivElement>(null);
+  const maxPanelHeightRef = useRef(0);
+  const [panelMinHeight, setPanelMinHeight] = useState(0);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -82,6 +93,15 @@ export default function GamePage() {
       // shorter than that is this transitional state, not a real reading.
       if (naturalHeight < CANVAS_H) return;
       maxNaturalHeightRef.current = Math.max(maxNaturalHeightRef.current, naturalHeight);
+      // Same "tallest ever" tracking, but for the panel alone — see
+      // `panelMinHeight` above. The panel is never absent, so there's no
+      // near-zero transitional reading to guard against here the way
+      // `naturalHeight` needs the `< CANVAS_H` check above.
+      const panelHeight = panelRef.current?.scrollHeight ?? 0;
+      if (panelHeight > maxPanelHeightRef.current) {
+        maxPanelHeightRef.current = panelHeight;
+        setPanelMinHeight(panelHeight);
+      }
       // Prioritize filling the full vertical space ("縦いっぱいに使う") — this
       // portrait-oriented game is almost always height-constrained on a
       // typical wide PC window, so a width cap here just leaves unused
@@ -210,6 +230,7 @@ export default function GamePage() {
         )}
 
         <div
+          ref={panelRef}
           style={{
             display: "flex",
             flexDirection: "column",
@@ -220,6 +241,13 @@ export default function GamePage() {
             border: "1px solid #2a3d52",
             borderRadius: 16,
             marginBottom: 6,
+            // Reserves the tallest-ever-seen panel height (see
+            // `panelMinHeight` above) so the board/HP bar below never
+            // shift position between phases — `border-box` so this
+            // matches the same `scrollHeight` basis (padding/border
+            // included) the measurement itself uses.
+            boxSizing: "border-box",
+            minHeight: panelMinHeight || undefined,
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
