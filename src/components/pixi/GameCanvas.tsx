@@ -44,6 +44,11 @@ import {
 
 interface Props {
   session: GameSession;
+  /** Freezes the simulation (and any in-flight gsap "juice" — projectiles,
+   * pops, the tray drop-in) while the pause menu is open, so nothing keeps
+   * happening to the run — enemies advancing, the base taking damage —
+   * behind the menu ("中断できるように"). */
+  paused: boolean;
 }
 
 interface DragState {
@@ -107,7 +112,7 @@ const ENEMY_FRAME_COUNT_OVERRIDES: Partial<Record<string, number | Partial<Recor
   slime: 9,
   troll: { walk: 4, attack: 6 },
   giant: { walk: 4, attack: 6 },
-  dragon: { walk: 6, attack: 7 },
+  dragon: { walk: 6, attack: 9 },
 };
 function enemyAnimFramePaths(enemyId: string, kind: "walk" | "attack"): string[] {
   const override = ENEMY_FRAME_COUNT_OVERRIDES[enemyId];
@@ -558,6 +563,14 @@ class EnemyView {
   private animElapsedMs = 0;
   private readonly frameDurationMs = 130;
   private readonly scale: number;
+  /** Enemies with a custom `attackIntervalMs` (currently just the dragon
+   * boss) space their real hits far enough apart that looping the attack
+   * animation continuously the whole time it's parked — every other
+   * enemy's behavior — would drift completely out of sync with them
+   * ("攻撃モーションはこれに合わしているものになってる？"). These instead
+   * hold a waiting loop and only play the attack frames once, exactly
+   * when `attackPulse()` is called alongside the actual hit. */
+  private readonly oneShotAttack: boolean;
   private dead = false;
   private maxHp: number;
   /** HP as currently *shown* on the bar — deliberately not synced to the
@@ -573,6 +586,7 @@ class EnemyView {
     this.displayHp = e.hp;
     const def = ENEMY_DEFS[e.defId];
     this.scale = def?.sizeScale ?? 1;
+    this.oneShotAttack = def?.attackIntervalMs !== undefined;
 
     const texture = textures.get(e.defId);
     if (texture) {
@@ -612,6 +626,19 @@ class EnemyView {
 
   update(e: EnemyInstance) {
     this.container.position.set(pathX(e.spawnX), pathY(e.progress));
+    if (this.oneShotAttack) {
+      // Parked-but-not-currently-mid-swing holds the waiting (walk) loop
+      // instead — `attackPulse()` is what switches it into the attack
+      // frames, once, right as the real hit lands. Only resets back to
+      // walk on the walk→breach edge; while breached this leaves
+      // `animMode` alone so it doesn't stomp on an in-progress pulse.
+      if (!e.hasBreached && this.animMode !== "walk") {
+        this.animMode = "walk";
+        this.animFrame = 0;
+        this.animElapsedMs = 0;
+      }
+      return;
+    }
     // Parked at the base (`hasBreached`) loops its punch instead of its
     // run cycle — reaching the front line is what triggers the attack
     // motion ("手前まで来たら殴るように"), and it keeps throwing punches
@@ -624,6 +651,17 @@ class EnemyView {
     }
   }
 
+  /** Plays the attack frames through exactly once, timed to the real hit
+   * (a "breach" battle event) instead of looping continuously — see
+   * `oneShotAttack`. No-op for every enemy that doesn't opt into this
+   * (i.e. everything except the dragon boss today). */
+  attackPulse() {
+    if (!this.oneShotAttack || this.attackFrames.length === 0) return;
+    this.animMode = "attack";
+    this.animFrame = 0;
+    this.animElapsedMs = 0;
+  }
+
   tick(dtMs: number) {
     if (this.dead || !this.bodySprite) return;
     const frames = this.animMode === "attack" ? this.attackFrames : this.walkFrames;
@@ -631,7 +669,13 @@ class EnemyView {
     this.animElapsedMs += dtMs;
     if (this.animElapsedMs < this.frameDurationMs) return;
     this.animElapsedMs -= this.frameDurationMs;
-    this.animFrame = (this.animFrame + 1) % frames.length;
+    this.animFrame++;
+    if (this.animFrame >= frames.length) {
+      this.animFrame = 0;
+      // A one-shot pulse is done after a single pass through the attack
+      // frames — back to the waiting loop until the next real hit.
+      if (this.oneShotAttack && this.animMode === "attack") this.animMode = "walk";
+    }
     this.bodySprite.texture = frames[this.animFrame];
     this.refitSprite();
   }
@@ -741,12 +785,22 @@ function drawTrayFrame(height: number): Graphics {
   return g;
 }
 
-export default function GameCanvas({ session }: Props) {
+export default function GameCanvas({ session, paused }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef(session);
   useEffect(() => {
     sessionRef.current = session;
   });
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+    // gsap's own tweens (projectiles, pops, the tray drop-in, etc.) run on
+    // gsap's independent RAF ticker, not this component's `app.ticker` —
+    // pausing/resuming the global timeline is what freezes those too while
+    // the pause menu is open, instead of just the simulation itself.
+    if (paused) gsap.globalTimeline.pause();
+    else gsap.globalTimeline.resume();
+  }, [paused]);
   // Loading all sprite/animation frames (now 5 species up to Lv5, plus
   // enemies) takes long enough on a first visit that a blank transparent
   // canvas reads as "stuck", not "starting" — this progress bar fills in
@@ -1307,6 +1361,108 @@ export default function GameCanvas({ session }: Props) {
         });
       }
 
+      /** The dragon boss's breach attack, specifically — a screen-wide,
+       * slower "roar" rather than the standard per-hit `spawnAttackEffect`
+       * burst ("画面横いっぱい使って派手な攻撃にしてほしい。尺も多く
+       * 取っていい"). Its lowered attack frequency (see `attackIntervalMs`
+       * on the `dragon` EnemyDef) leaves room for this to play out fully
+       * before it can repeat. */
+      function spawnDragonBreachEffect(x: number, y: number) {
+        const primary = 0x3a1f4d;
+        const secondary = 0xff8a3d;
+
+        // Dark shockwave sweeping outward from the dragon's position to
+        // fill the *entire* canvas width, not just its local footprint —
+        // two halves so each can grow from a zero-width sliver at `x`
+        // toward its own edge of the screen.
+        const waveLeft = new Graphics();
+        waveLeft.rect(-x, -4, x, 8).fill({ color: primary, alpha: 0.8 });
+        waveLeft.position.set(x, y);
+        waveLeft.scale.x = 0;
+        effectsLayer.addChild(waveLeft);
+        const waveRight = new Graphics();
+        waveRight.rect(0, -4, CANVAS_W - x, 8).fill({ color: primary, alpha: 0.8 });
+        waveRight.position.set(x, y);
+        waveRight.scale.x = 0;
+        effectsLayer.addChild(waveRight);
+        gsap.to([waveLeft.scale, waveRight.scale], { x: 1, duration: 0.5, ease: "power2.out" });
+        gsap.to([waveLeft, waveRight], {
+          alpha: 0,
+          duration: 0.5,
+          delay: 0.35,
+          onComplete: () => {
+            effectsLayer.removeChild(waveLeft);
+            effectsLayer.removeChild(waveRight);
+          },
+        });
+
+        // Central flash/burst/ring, all sized and timed well beyond the
+        // normal per-hit versions above.
+        const flash = new Graphics();
+        flash.circle(0, 0, 20).fill({ color: 0xffffff, alpha: 0.95 });
+        flash.position.set(x, y);
+        effectsLayer.addChild(flash);
+        gsap.to(flash.scale, { x: 3, y: 3, duration: 0.22, ease: "power2.out" });
+        gsap.to(flash, { alpha: 0, duration: 0.3, onComplete: () => effectsLayer.removeChild(flash) });
+
+        const burst = new Graphics();
+        burst.circle(0, 0, 30).fill({ color: secondary, alpha: 0.85 });
+        burst.position.set(x, y);
+        effectsLayer.addChild(burst);
+        gsap.to(burst.scale, { x: 4.5, y: 4.5, duration: 0.7, ease: "power1.out" });
+        gsap.to(burst, { alpha: 0, duration: 0.7, onComplete: () => effectsLayer.removeChild(burst) });
+
+        const ring = new Graphics();
+        ring.circle(0, 0, 22).stroke({ color: secondary, width: 5, alpha: 0.95 });
+        ring.position.set(x, y);
+        effectsLayer.addChild(ring);
+        gsap.to(ring.scale, { x: 5.5, y: 5.5, duration: 0.75, ease: "power1.out", delay: 0.06 });
+        gsap.to(ring, { alpha: 0, duration: 0.75, delay: 0.06, onComplete: () => effectsLayer.removeChild(ring) });
+
+        spawnSparkParticles(x, y, secondary, 16);
+
+        // Slower, longer-traveling embers than the standard spark burst,
+        // to fill the extra duration this effect is allowed to take.
+        const emberCount = 14;
+        for (let i = 0; i < emberCount; i++) {
+          const ember = new Graphics();
+          const size = randRange(3, 6);
+          ember.circle(0, 0, size).fill({ color: i % 2 === 0 ? secondary : primary, alpha: 0.9 });
+          ember.position.set(x, y);
+          effectsLayer.addChild(ember);
+          const angle = randRange(0, Math.PI * 2);
+          const dist = randRange(60, 110);
+          gsap.to(ember, {
+            x: x + Math.cos(angle) * dist,
+            y: y + Math.sin(angle) * dist,
+            alpha: 0,
+            duration: randRange(0.6, 0.9),
+            ease: "power1.out",
+            onComplete: () => effectsLayer.removeChild(ember),
+          });
+        }
+
+        // Full-canvas dark flash — sells "screen-wide" beyond just the
+        // shockwave bar.
+        const vignette = new Graphics();
+        vignette.rect(0, 0, CANVAS_W, CANVAS_H).fill({ color: primary, alpha: 0 });
+        effectsLayer.addChild(vignette);
+        gsap
+          .timeline({ onComplete: () => effectsLayer.removeChild(vignette) })
+          .to(vignette, { alpha: 0.35, duration: 0.12 })
+          .to(vignette, { alpha: 0, duration: 0.5 });
+
+        // Heavier, longer screen shake than a normal hit's.
+        const shake = 7;
+        gsap
+          .timeline()
+          .to(app.stage, { x: shake, y: -shake * 0.6, duration: 0.05 })
+          .to(app.stage, { x: -shake, y: shake * 0.6, duration: 0.06 })
+          .to(app.stage, { x: shake * 0.7, y: -shake * 0.4, duration: 0.06 })
+          .to(app.stage, { x: -shake * 0.4, y: shake * 0.2, duration: 0.06 })
+          .to(app.stage, { x: 0, y: 0, duration: 0.08 });
+      }
+
       app.stage.eventMode = "static";
       app.stage.hitArea = app.screen;
 
@@ -1783,6 +1939,12 @@ export default function GameCanvas({ session }: Props) {
       });
 
       function tickFrame(deltaMS: number) {
+        // Skips the simulation tick entirely — enemy movement, attack
+        // cooldowns, breach damage, all of it — rather than merely hiding
+        // the canvas behind a menu; sprite `tick()` calls (idle/walk frame
+        // stepping) below never run either, so everything visibly holds
+        // its current frame instead of only *looking* paused.
+        if (pausedRef.current) return;
         const events = sessionRef.current.tick(deltaMS);
         // `getSnapshot()`, not `.snapshot` — see the doc comment on
         // `GameSession.getSnapshot` for why the latter is stale here.
@@ -1825,6 +1987,18 @@ export default function GameCanvas({ session }: Props) {
               }
             }
             monsterViews.get(ev.monsterId)?.attackPulse();
+          }
+          // The dragon boss's breach hits get their own screen-wide effect
+          // (see `spawnDragonBreachEffect`) — every other enemy's breach
+          // stays visually silent (just the HP bar's own shake/drop), as
+          // before.
+          if (ev.type === "breach") {
+            const enemy = snap.enemies.find((e) => e.instanceId === ev.enemyId);
+            const view = enemyViews.get(ev.enemyId);
+            if (enemy?.defId === "dragon" && view) {
+              spawnDragonBreachEffect(view.container.x, view.container.y);
+              view.attackPulse();
+            }
           }
         }
 

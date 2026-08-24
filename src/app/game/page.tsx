@@ -21,6 +21,11 @@ export default function GamePage() {
   const { snapshot } = session;
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  // Pause menu ("中断できるように") — opening it freezes the simulation
+  // (see the `paused` prop on GameCanvas) rather than just overlaying a
+  // menu on top of a run that keeps playing out underneath.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
   // The info panel above the canvas is taller during "initial-placement"/
   // "reward" (extra instructions + buttons) than during "battle" (just the
   // Wave/coins/kills row) — scoring the scale off whatever height is
@@ -132,6 +137,39 @@ export default function GamePage() {
           transform: `scale(${scale})`,
           transformOrigin: "center center",
         }}>
+        {snapshot.phase !== "gameover" && (
+          // Absolutely positioned so it overlays the existing layout
+          // without shifting anything else ("他の要素の配置は変えない
+          // ように") — the gameover overlay already offers the same
+          // destinations, so this is hidden there instead of stacking a
+          // second menu on top of it.
+          <button
+            className="press-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="メニュー"
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              zIndex: 20,
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              borderRadius: 999,
+              border: "1px solid #2a3d52",
+              background: "rgba(20,32,44,0.85)",
+              color: "var(--foreground)",
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ☰
+          </button>
+        )}
+
         <div
           style={{
             display: "flex",
@@ -188,7 +226,7 @@ export default function GamePage() {
         </div>
 
         <div style={{ width: "100%", overflowX: "auto" }}>
-          <GameCanvas session={session} />
+          <GameCanvas session={session} paused={menuOpen} />
         </div>
 
         <HpBar hp={snapshot.baseHp} maxHp={snapshot.baseMaxHp} />
@@ -220,6 +258,66 @@ export default function GamePage() {
           </div>
         )}
       </div>
+
+      {menuOpen && (
+        // Rendered as a sibling of the scaled `contentRef` div, not inside
+        // it — that div carries `transform: scale(...)`, and a
+        // `transform` on an ancestor re-anchors any `position: fixed`
+        // descendant to *that ancestor's* box instead of the real
+        // viewport. Escaping it here is what lets `inset: 0` actually
+        // cover the whole screen ("画面全体") regardless of the game's
+        // current zoom level, not just the CANVAS_W-wide game area.
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 30,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(10,16,22,0.85)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              alignItems: "stretch",
+              width: 240,
+              padding: "28px 24px 24px",
+              borderRadius: 20,
+              border: "1px solid #2a3d52",
+              background: "var(--panel)",
+              textAlign: "center",
+            }}
+          >
+            <h2 style={{ marginBottom: 4 }}>メニュー</h2>
+            <button className="press-btn" onClick={closeMenu} style={startButtonStyle(true)}>
+              再開
+            </button>
+            <button
+              className="press-btn"
+              onClick={() => {
+                session.resetRun();
+                closeMenu();
+              }}
+              style={rerollButtonStyle(true)}
+            >
+              リトライ
+            </button>
+            <Link className="press-btn" href="/" style={secondaryButtonStyle(true)}>
+              タイトルへ戻る
+            </Link>
+            <Link className="press-btn" href="/ranking" style={secondaryButtonStyle(true)}>
+              ランキングへ
+            </Link>
+            <button className="press-btn" onClick={closeMenu} style={secondaryButtonStyle(true)}>
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

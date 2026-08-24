@@ -91,6 +91,32 @@ describe("BattleEngine", () => {
     expect(snapshot.killCount).toBe(0);
   });
 
+  it("spaces the dragon boss's repeated breach hits out further than the default 1s interval", () => {
+    const engine = new BattleEngine([]);
+    const wave: WaveDefinition = {
+      wave: 1,
+      spawns: [{ spawnX: 0.5, enemyId: "dragon", delayMs: 0 }],
+    };
+    engine.startWave(wave);
+    // One big tick both walks it all the way to the base (dragon's
+    // baseSpeed needs ~20s of simulated time) and lands its first breach
+    // hit, matching the "single large tick" pattern used elsewhere in this
+    // file rather than looping many small ones.
+    engine.tick(20500);
+    const hpAfterBreach = engine.getSnapshot().baseHp;
+    expect(hpAfterBreach).toBeLessThan(BASE_MAX_HP);
+
+    // The default 1s interval every other enemy re-attacks on — dragon's
+    // own `attackIntervalMs` override (3000ms) means it must NOT have
+    // re-hit yet.
+    engine.tick(1000);
+    expect(engine.getSnapshot().baseHp).toBe(hpAfterBreach);
+
+    // Now past its own interval.
+    engine.tick(2500);
+    expect(engine.getSnapshot().baseHp).toBeLessThan(hpAfterBreach);
+  });
+
   it("reduces base HP and ends the run when it hits zero", () => {
     const engine = new BattleEngine([]);
     const wave: WaveDefinition = {

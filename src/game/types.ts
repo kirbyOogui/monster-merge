@@ -62,6 +62,11 @@ export interface EnemyDef {
    * hp/damage) are drawn physically bigger so power reads visually, on
    * top of the art itself getting bulkier/more armored per tier. */
   sizeScale: number;
+  /** Overrides the default interval between a breached enemy's repeated
+   * base-damage hits (see `ENEMY_ATTACK_INTERVAL_MS` in battle.ts). Left
+   * unset for every normal enemy; a boss-tier enemy with a slower, more
+   * telegraphed attack can space its hits out further than the default. */
+  attackIntervalMs?: number;
 }
 
 export interface EnemyInstance {

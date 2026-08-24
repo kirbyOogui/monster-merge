@@ -241,7 +241,8 @@ export class BattleEngine {
       // it's removed only once `resolveAttacks` kills it.
       if (enemy.hasBreached) {
         const last = this.lastEnemyAttackAt.get(enemy.instanceId) ?? -Infinity;
-        if (this.elapsedMs - last >= ENEMY_ATTACK_INTERVAL_MS) {
+        const intervalMs = ENEMY_DEFS[enemy.defId]?.attackIntervalMs ?? ENEMY_ATTACK_INTERVAL_MS;
+        if (this.elapsedMs - last >= intervalMs) {
           this.lastEnemyAttackAt.set(enemy.instanceId, this.elapsedMs);
           this.baseHp = Math.max(0, this.baseHp - enemy.damage);
           events.push({ type: "breach", enemyId: enemy.instanceId, damage: enemy.damage });
