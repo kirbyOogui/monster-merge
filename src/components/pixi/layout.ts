@@ -12,26 +12,37 @@ export const CELL = 64;
 export const BOARD_PX = CELL * 4;
 export const CANVAS_W = 380;
 export const BOARD_X = (CANVAS_W - BOARD_PX) / 2;
+
+/**
+ * Extra canvas drawn ABOVE where the play area used to begin, so enemies
+ * can spawn up against the bottom of the Wave/coins/kills panel.
+ *
+ * The panel's reserved height is locked to its tallest variant (the
+ * reward/placement layout, ~98px — see the spacer in game/page.tsx), but
+ * during battle it collapses to a single Wave/coins/kills row (~34px),
+ * leaving ~64px of empty background between it and the old canvas top.
+ * Every earlier attempt just moved the spawn point around *inside* the
+ * canvas, which starts below that gap — so a spawned enemy could never
+ * visually reach up to the shrunken battle panel ("戦闘中は縦短くなって
+ * るからそれに合わせて"). This grows the canvas upward by that much
+ * instead; `game/page.tsx` pulls the canvas element up by the same amount
+ * (negative margin) so the board, tray and HP bar stay pixel-for-pixel
+ * where they were in every phase — only the enemy lane gains the height.
+ */
+export const SPAWN_HEADROOM = 74;
+
 /**
  * y of an enemy's transform origin (roughly its feet) the instant it
- * spawns. Enemy sprites are bottom-ish anchored (0.5 / 0.85) and much
- * taller than this point, so they extend well *above* it.
- *
- * This has been tuned back and forth: 20 left the body sitting above the
- * canvas top so an enemy only became fully visible a third of the way
- * down the road; 104 fixed that but pushed the whole enemy visibly down
- * into the upper-middle of the lane. This value splits the difference —
- * a normal-sized enemy's body clears the canvas top edge right at spawn
- * so it emerges just under the Wave/coins/kills panel (which shrinks to a
- * single row during battle, keeping that strip of background clear to
- * line up against — "コインとか表示してある枠の下くらい") while sitting
- * as high as it can without most of it being clipped. The biggest enemies
- * (troll/giant) still have their head/HP bar briefly clipped by the top
- * edge as they walk in. Lower this to raise the spawn further (more
- * clipping); raise it to drop the spawn.
+ * spawns. Enemy sprites are bottom-ish anchored (0.5 / 0.85) and taller
+ * than this offset, so they extend above it — this is ~one sprite-height
+ * so a normal enemy's whole body clears the canvas top (now raised by
+ * `SPAWN_HEADROOM`) and it emerges right under the collapsed battle
+ * panel. Biggest enemies (troll/giant) still clip their head/HP bar for
+ * the first moment. Raise to drop the spawn; lower to raise it (more
+ * clipping).
  */
-export const LANE_TOP_Y = 48;
-export const BOARD_Y = 280;
+export const LANE_TOP_Y = 64;
+export const BOARD_Y = 280 + SPAWN_HEADROOM;
 export const CANVAS_H = BOARD_Y + BOARD_PX + 16;
 
 /**
@@ -59,10 +70,11 @@ export const LANE_X = (CANVAS_W - LANE_PX) / 2;
  * no per-item scaling — so a 1x1 and an h3 read at a consistent scale.
  */
 export const TRAY_X0 = 16;
-// Kept where the enemy lane used to start (old LANE_TOP_Y 20 + 30), so
-// moving the spawn point down (above) doesn't drag the out-of-battle tray
-// down with it.
-export const TRAY_Y = 50;
+// 50 in the pre-`SPAWN_HEADROOM` coordinate space; offset by the headroom
+// so the tray stays visually pinned (the canvas element is pulled up by
+// `SPAWN_HEADROOM` in game/page.tsx) rather than sliding up into the
+// panel with the raised canvas top.
+export const TRAY_Y = 50 + SPAWN_HEADROOM;
 export const TRAY_CELL = 56;
 export const TRAY_PAD = 4;
 export const TRAY_ITEM_GAP = 4;

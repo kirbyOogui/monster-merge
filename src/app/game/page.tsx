@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useGameSession } from "@/hooks/useGameSession";
-import { CANVAS_H, CANVAS_W } from "@/components/pixi/layout";
+import { CANVAS_H, CANVAS_W, SPAWN_HEADROOM } from "@/components/pixi/layout";
 import { rerollButtonStyle, secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
 
 const GameCanvas = dynamic(() => import("@/components/pixi/GameCanvas"), {
@@ -311,7 +311,14 @@ export default function GamePage() {
           </div>
         </div>
 
-        <div style={{ width: "100%", overflowX: "auto" }}>
+        {/* The canvas is `SPAWN_HEADROOM`px taller than the play area (extra
+            room at the TOP for enemies to spawn against the collapsed
+            battle panel — see layout.ts). Pulling it up by exactly that
+            much overlaps the panel spacer's empty lower region without
+            moving the board/HP bar: the canvas grew and shifted up by the
+            same amount, so its bottom edge — and everything after it —
+            stays put. */}
+        <div style={{ width: "100%", overflowX: "auto", marginTop: -SPAWN_HEADROOM }}>
           <GameCanvas session={session} paused={menuOpen} />
         </div>
 
