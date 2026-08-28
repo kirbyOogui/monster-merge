@@ -12,7 +12,23 @@ export const CELL = 64;
 export const BOARD_PX = CELL * 4;
 export const CANVAS_W = 380;
 export const BOARD_X = (CANVAS_W - BOARD_PX) / 2;
-export const LANE_TOP_Y = 20;
+/**
+ * y of an enemy's transform origin (roughly its feet) the instant it
+ * spawns. Enemy sprites are bottom-ish anchored (0.5 / 0.85) and much
+ * taller than this point, so they extend well *above* it — at the old
+ * value of 20 the whole body sat above the canvas top and an enemy only
+ * became fully visible once it had walked a third of the way down the
+ * road, reading as "spawning in the middle of the lane". Pushed down so a
+ * normal-sized enemy is entirely on-screen the moment it appears, right
+ * under the Wave/coins/kills panel — which shrinks to a single row during
+ * battle, leaving that strip of background clear for the spawn to line up
+ * against ("コインとか表示してある枠の下くらい"). Trade-off: the walk
+ * lane (BOARD_Y - LANE_TOP_Y) is correspondingly shorter, so enemies
+ * reach the base sooner in real time; the biggest enemies (troll/giant)
+ * still have their HP bar clipped by the canvas edge for the first
+ * fraction of a second after spawning.
+ */
+export const LANE_TOP_Y = 104;
 export const BOARD_Y = 280;
 export const CANVAS_H = BOARD_Y + BOARD_PX + 16;
 
@@ -41,7 +57,10 @@ export const LANE_X = (CANVAS_W - LANE_PX) / 2;
  * no per-item scaling — so a 1x1 and an h3 read at a consistent scale.
  */
 export const TRAY_X0 = 16;
-export const TRAY_Y = LANE_TOP_Y + 30;
+// Kept where the enemy lane used to start (old LANE_TOP_Y 20 + 30), so
+// moving the spawn point down (above) doesn't drag the out-of-battle tray
+// down with it.
+export const TRAY_Y = 50;
 export const TRAY_CELL = 56;
 export const TRAY_PAD = 4;
 export const TRAY_ITEM_GAP = 4;

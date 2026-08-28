@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import TitleFooter from "@/components/TitleFooter";
 import { secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
 
 export default function TitlePage() {
@@ -48,7 +49,10 @@ export default function TitlePage() {
         </Link>
       </nav>
 
-      <p style={{ opacity: 0.5, fontSize: "0.75rem", marginTop: 32 }}>縦画面推奨（PC / スマホブラウザ対応）</p>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 32 }}>
+        <p style={{ opacity: 0.5, fontSize: "0.75rem", margin: 0 }}>縦画面推奨（PC / スマホブラウザ対応）</p>
+        <TitleFooter />
+      </div>
     </main>
   );
 }
