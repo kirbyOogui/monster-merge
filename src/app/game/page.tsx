@@ -250,6 +250,16 @@ export default function GamePage() {
             boxSizing: "border-box",
             minHeight: panelMinHeight || undefined,
             marginBottom: 6,
+            // The canvas below is pulled up (negative margin) so its
+            // transparent top overlaps this spacer's lower region — which
+            // would otherwise let the canvas swallow clicks meant for the
+            // panel's buttons ("ウェーブ開始ボタンが押せない"). Stack this
+            // above the canvas, but keep the empty reserved area
+            // click-through (pointerEvents:none here, re-enabled only on
+            // the visible panel box below) so it never blocks the lane.
+            position: "relative",
+            zIndex: 1,
+            pointerEvents: "none",
           }}
         >
           <div
@@ -266,6 +276,9 @@ export default function GamePage() {
               // Sized to its own current content only ("枠が大きいまま
               // になってますが、1行分で足りるので小さくする") — the
               // wrapper above is what reserves the extra room, not this.
+              // Re-enable clicks here (parent spacer is pointerEvents:none)
+              // so the buttons work where the pulled-up canvas overlaps.
+              pointerEvents: "auto",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -335,6 +348,10 @@ export default function GamePage() {
               justifyContent: "center",
               textAlign: "center",
               background: "rgba(10,16,22,0.92)",
+              // Above the panel spacer's `zIndex: 1` (added so it wins the
+              // click over the pulled-up canvas) — without this the Wave
+              // row would paint on top of the gameover screen.
+              zIndex: 3,
             }}
           >
             <h2 style={{ marginBottom: 8 }}>ゲームオーバー</h2>
