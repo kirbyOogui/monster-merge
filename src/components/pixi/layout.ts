@@ -15,20 +15,22 @@ export const BOARD_X = (CANVAS_W - BOARD_PX) / 2;
 /**
  * y of an enemy's transform origin (roughly its feet) the instant it
  * spawns. Enemy sprites are bottom-ish anchored (0.5 / 0.85) and much
- * taller than this point, so they extend well *above* it — at the old
- * value of 20 the whole body sat above the canvas top and an enemy only
- * became fully visible once it had walked a third of the way down the
- * road, reading as "spawning in the middle of the lane". Pushed down so a
- * normal-sized enemy is entirely on-screen the moment it appears, right
- * under the Wave/coins/kills panel — which shrinks to a single row during
- * battle, leaving that strip of background clear for the spawn to line up
- * against ("コインとか表示してある枠の下くらい"). Trade-off: the walk
- * lane (BOARD_Y - LANE_TOP_Y) is correspondingly shorter, so enemies
- * reach the base sooner in real time; the biggest enemies (troll/giant)
- * still have their HP bar clipped by the canvas edge for the first
- * fraction of a second after spawning.
+ * taller than this point, so they extend well *above* it.
+ *
+ * This has been tuned back and forth: 20 left the body sitting above the
+ * canvas top so an enemy only became fully visible a third of the way
+ * down the road; 104 fixed that but pushed the whole enemy visibly down
+ * into the upper-middle of the lane. This value splits the difference —
+ * a normal-sized enemy's body clears the canvas top edge right at spawn
+ * so it emerges just under the Wave/coins/kills panel (which shrinks to a
+ * single row during battle, keeping that strip of background clear to
+ * line up against — "コインとか表示してある枠の下くらい") while sitting
+ * as high as it can without most of it being clipped. The biggest enemies
+ * (troll/giant) still have their head/HP bar briefly clipped by the top
+ * edge as they walk in. Lower this to raise the spawn further (more
+ * clipping); raise it to drop the spawn.
  */
-export const LANE_TOP_Y = 104;
+export const LANE_TOP_Y = 48;
 export const BOARD_Y = 280;
 export const CANVAS_H = BOARD_Y + BOARD_PX + 16;
 
