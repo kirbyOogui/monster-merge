@@ -541,6 +541,18 @@ class MonsterView {
       this.bodySprite.texture = this.attackFrames[0];
     }
   }
+
+  /** Every merge builds a fresh MonsterView and discards the old one — a
+   * plain `removeChild` only unparents it, leaving its Graphics/Text/Sprite
+   * GPU resources allocated until GC (if ever). Free them explicitly, and
+   * kill any in-flight pop/recoil tween so it can't write to a destroyed
+   * container. Shared textures come from the load maps, so `texture: false`
+   * keeps them. */
+  destroy() {
+    gsap.killTweensOf([this.container, this.container.scale]);
+    this.container.destroy({ children: true, texture: false });
+    this.spriteContainer.destroy({ children: true, texture: false });
+  }
 }
 
 /** Base on-screen size (px, before `sizeScale`) for an enemy sprite — enemies
@@ -717,6 +729,16 @@ class EnemyView {
     this.container.filters = [grayscale];
     gsap.to(this.container, { alpha: 0, duration: 0.3, delay: 3, ease: "power1.in", onComplete });
   }
+
+  /** Free this enemy's GPU resources once it's off-screen (kill fade done,
+   * or removed outright). Every kill allocates a fresh ColorMatrixFilter
+   * and the sprite/HP-bar Graphics; `removeChild` alone leaves them around.
+   * Kill any in-flight flash/fade tween and drop the filter first. */
+  destroy() {
+    gsap.killTweensOf([this.container, this.container.scale]);
+    this.container.filters = [];
+    this.container.destroy({ children: true, texture: false });
+  }
 }
 
 function drawStaticBoard(stage: Container) {
@@ -800,6 +822,13 @@ export default function GameCanvas({ session, paused }: Props) {
     // the pause menu is open, instead of just the simulation itself.
     if (paused) gsap.globalTimeline.pause();
     else gsap.globalTimeline.resume();
+    // If the component unmounts while paused (the pause menu's "タイトルへ"
+    // / "ランキングへ" links navigate away), always resume on the way out —
+    // otherwise gsap's global timeline is left paused process-wide and
+    // only self-heals on a later fresh mount of this screen.
+    return () => {
+      gsap.globalTimeline.resume();
+    };
   }, [paused]);
   // Loading all sprite/animation frames (now 5 species up to Lv5, plus
   // enemies) takes long enough on a first visit that a blank transparent
@@ -1479,6 +1508,14 @@ export default function GameCanvas({ session, paused }: Props) {
       // repositioned — see the comment on the drop-in tween inside
       // `syncTray` for why that distinction matters.
       const trayViews = new Map<string, TrayView>();
+      // TrayView is a plain record (no class), so its two Containers are
+      // freed here rather than via a method. Every reroll / tray-merge
+      // rebuilds candidates, so this runs often.
+      function destroyTrayView(view: TrayView) {
+        gsap.killTweensOf([view.container, view.container.scale]);
+        view.container.destroy({ children: true, texture: false });
+        view.spriteContainer.destroy({ children: true, texture: false });
+      }
       let drag: DragState | null = null;
       let draggingInstanceId: string | null = null;
       let renderedTrayKey = "";
@@ -1707,6 +1744,7 @@ export default function GameCanvas({ session, paused }: Props) {
             monsterLayer.removeChild(view.container);
             monsterSpriteLayer.removeChild(view.spriteContainer);
             monsterViews.delete(id);
+            view.destroy();
           }
         }
       }
@@ -1738,9 +1776,13 @@ export default function GameCanvas({ session, paused }: Props) {
               // A kill can still whiff the coin flip (`coinReward === 0`) —
               // only pop the "+N" toast when something was actually earned.
               if (coinReward > 0) spawnCoinPopup(view.container.x, view.container.y, coinReward);
-              view.killPop(() => enemyLayer.removeChild(view.container));
+              view.killPop(() => {
+                enemyLayer.removeChild(view.container);
+                view.destroy();
+              });
             } else {
               enemyLayer.removeChild(view.container);
+              view.destroy();
             }
           }
         }
@@ -1846,6 +1888,7 @@ export default function GameCanvas({ session, paused }: Props) {
             trayLayer.removeChild(existing.container);
             traySpriteLayer.removeChild(existing.spriteContainer);
             trayViews.delete(item.offerId);
+            destroyTrayView(existing);
           }
 
           const species = getSpecies(item.speciesId);
@@ -1919,6 +1962,7 @@ export default function GameCanvas({ session, paused }: Props) {
             trayLayer.removeChild(view.container);
             traySpriteLayer.removeChild(view.spriteContainer);
             trayViews.delete(offerId);
+            destroyTrayView(view);
           }
         }
       }
@@ -2025,6 +2069,17 @@ export default function GameCanvas({ session, paused }: Props) {
 
     return () => {
       destroyed = true;
+      // Kill every in-flight tween/timeline before tearing down Pixi.
+      // gsap is only ever used by this component, and each VFX tween's
+      // `onComplete` calls `effectsLayer.removeChild(...)` / `enemyLayer
+      // .removeChild(...)` — left running, those fire against a scene
+      // graph that `app.destroy()` has already nulled out and throw
+      // inside gsap's ticker (and `killPop`'s `delay: 3` tween would hold
+      // the whole graph alive for seconds). `resume()` also undoes a
+      // still-paused global timeline if we unmount straight from the
+      // pause menu.
+      gsap.globalTimeline.resume();
+      for (const anim of gsap.globalTimeline.getChildren(true, true, true)) anim.kill();
       if (initialized) app.destroy(true, { children: true });
     };
   }, []);
