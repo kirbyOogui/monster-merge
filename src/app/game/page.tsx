@@ -331,7 +331,15 @@ export default function GamePage() {
             moving the board/HP bar: the canvas grew and shifted up by the
             same amount, so its bottom edge — and everything after it —
             stays put. */}
-        <div style={{ width: "100%", overflowX: "auto", marginTop: -SPAWN_HEADROOM }}>
+        {/* `overflow: hidden` (was `overflowX: auto`): this is a fixed-size
+            scaled game frame, not a scrollable area — the old value drew a
+            visible inner scrollbar on desktop (and, because a non-`visible`
+            overflow-x forces overflow-y to `auto` too, a vertical one from
+            a sub-pixel/`inline-block` descender overflow). `<main>` and
+            `html,body` already clip; this just stops the wrapper adding its
+            own bars. Nothing real is clipped — the wrapper shrink-wraps the
+            canvas exactly. */}
+        <div style={{ width: "100%", overflow: "hidden", marginTop: -SPAWN_HEADROOM }}>
           <GameCanvas session={session} paused={menuOpen} />
         </div>
 
