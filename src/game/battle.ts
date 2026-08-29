@@ -93,6 +93,20 @@ export class BattleEngine {
   private rng: Rng;
   private listeners = new Set<() => void>();
   private snapshot: GameRunState;
+  /** Signature of the last snapshot the React listeners were notified for.
+   * `tick()` publishes every frame so `getSnapshot()` stays live for the
+   * Pixi layer's direct read, but the DOM HUD only shows these fields — so
+   * we skip notifying (and re-rendering the whole `/game` subtree ~60×/s)
+   * on frames where only enemy positions / `elapsedMs` moved. */
+  private lastNotifiedHud: {
+    baseHp: number;
+    coins: number;
+    wave: number;
+    killCount: number;
+    phase: GamePhase;
+    rewardOffer: RewardOfferEntry[];
+    board: PlacedMonster[];
+  } | null = null;
 
   constructor(initialBoard: PlacedMonster[], rng: Rng = defaultRng) {
     this.board = initialBoard;
@@ -236,12 +250,16 @@ export class BattleEngine {
   }
 
   private advanceEnemies(dtMs: number, events: BattleEvent[]): void {
-    const survivors: EnemyInstance[] = [];
+    // Enemies are mutated in place — nothing external keys off their object
+    // identity (the view layer and `getSnapshot` consumers all look them up
+    // by `instanceId`, and `resolveAttacks` already mutates `hp` directly),
+    // and `advanceEnemies` never removes any (breached ones stay parked as
+    // targets; only `resolveAttacks` drops the dead). Skipping the old
+    // per-enemy `{ ...enemy }` spread + `survivors` array saves ~one alloc
+    // per enemy per frame, which matters at `maxEnemyCount` on a phone.
     for (const enemy of this.enemies) {
-      // Already breached: stays parked at the base line as an attackable
-      // target rather than continuing to move, and keeps re-dealing its
-      // damage to the base on an interval for as long as it's alive —
-      // it's removed only once `resolveAttacks` kills it.
+      // Already breached: parked at the base line as an attackable target,
+      // re-dealing its damage on an interval for as long as it's alive.
       if (enemy.hasBreached) {
         const last = this.lastEnemyAttackAt.get(enemy.instanceId) ?? -Infinity;
         const intervalMs = ENEMY_DEFS[enemy.defId]?.attackIntervalMs ?? ENEMY_ATTACK_INTERVAL_MS;
@@ -250,20 +268,19 @@ export class BattleEngine {
           this.baseHp = Math.max(0, this.baseHp - enemy.damage);
           events.push({ type: "breach", enemyId: enemy.instanceId, damage: enemy.damage });
         }
-        survivors.push(enemy);
         continue;
       }
       const progress = enemy.progress + (enemy.speed * dtMs) / 1000;
       if (progress >= 1) {
+        enemy.progress = 1;
+        enemy.hasBreached = true;
         this.lastEnemyAttackAt.set(enemy.instanceId, this.elapsedMs);
         this.baseHp = Math.max(0, this.baseHp - enemy.damage);
         events.push({ type: "breach", enemyId: enemy.instanceId, damage: enemy.damage });
-        survivors.push({ ...enemy, progress: 1, hasBreached: true });
         continue;
       }
-      survivors.push({ ...enemy, progress });
+      enemy.progress = progress;
     }
-    this.enemies = survivors;
     if (this.baseHp <= 0 && this.phase === "battle") {
       this.phase = "gameover";
       events.push({ type: "gameOver" });
@@ -284,12 +301,17 @@ export class BattleEngine {
     // piling redundant overkill onto it while other approaching enemies
     // go completely untouched. Monsters prefer a not-yet-hit enemy and
     // only fall back to a shared target when nothing else is alive.
+    // Furthest-along-first ordering is the same for every monster, so sort
+    // once per tick instead of re-sorting inside the loop. `hp` still
+    // mutates as monsters fire below, so each monster re-checks `hp > 0`
+    // against this shared list (a cheap filter, no re-sort).
+    const attackableByProgress = this.enemies
+      .filter((e) => e.progress >= MIN_ATTACKABLE_PROGRESS)
+      .sort((a, b) => b.progress - a.progress);
     const attackedThisTick = new Set<string>();
     for (const monster of this.board) {
       const stats = resolveMonsterStats(monster.shape, monster.level);
-      const alive = this.enemies
-        .filter((e) => e.hp > 0 && e.progress >= MIN_ATTACKABLE_PROGRESS)
-        .sort((a, b) => b.progress - a.progress);
+      const alive = attackableByProgress.filter((e) => e.hp > 0);
       if (alive.length === 0) continue;
 
       const last = this.lastAttackAt.get(monster.instanceId) ?? -Infinity;
@@ -353,6 +375,27 @@ export class BattleEngine {
 
   private publish(): void {
     this.snapshot = this.buildSnapshot();
+    const s = this.snapshot;
+    const prev = this.lastNotifiedHud;
+    const hudChanged =
+      prev === null ||
+      prev.baseHp !== s.baseHp ||
+      prev.coins !== s.coins ||
+      prev.wave !== s.wave ||
+      prev.killCount !== s.killCount ||
+      prev.phase !== s.phase ||
+      prev.rewardOffer !== s.rewardOffer ||
+      prev.board !== s.board;
+    if (!hudChanged) return;
+    this.lastNotifiedHud = {
+      baseHp: s.baseHp,
+      coins: s.coins,
+      wave: s.wave,
+      killCount: s.killCount,
+      phase: s.phase,
+      rewardOffer: s.rewardOffer,
+      board: s.board,
+    };
     this.listeners.forEach((cb) => cb());
   }
 
