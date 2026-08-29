@@ -79,7 +79,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     // something a maxed board melts in a couple of seconds.
     baseHp: 11000,
     baseSpeed: 0.05,
-    baseDamage: 130,
+    // ~2.3x the previous 130 — a boss breach should genuinely hurt.
+    baseDamage: 299,
     coinDropChance: 1,
     coinReward: 60,
     sizeScale: 2.6,
