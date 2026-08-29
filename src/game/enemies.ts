@@ -83,7 +83,11 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     baseDamage: 299,
     coinDropChance: 1,
     coinReward: 60,
-    sizeScale: 2.6,
+    // Solo boss — much bigger than any normal enemy (giant is 2.0) so it
+    // fills the lane and reads as a genuine wall. It clips at the canvas
+    // top for the first moment after spawning, which is fine for a boss
+    // that then walks fully into view.
+    sizeScale: 3.5,
     // A slower, heavier-hitting-feeling cadence than every other enemy's
     // 1s default ("攻撃頻度をおとす") — its breach attack also gets a
     // much bigger screen-wide effect (see spawnDragonBreachEffect in
