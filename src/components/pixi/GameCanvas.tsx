@@ -1400,30 +1400,27 @@ export default function GameCanvas({ session, paused }: Props) {
         const primary = 0x3a1f4d;
         const secondary = 0xff8a3d;
 
-        // Dark shockwave sweeping outward from the dragon's position to
-        // fill the *entire* canvas width, not just its local footprint —
-        // two halves so each can grow from a zero-width sliver at `x`
-        // toward its own edge of the screen.
-        const waveLeft = new Graphics();
-        waveLeft.rect(-x, -4, x, 8).fill({ color: primary, alpha: 0.8 });
-        waveLeft.position.set(x, y);
-        waveLeft.scale.x = 0;
-        effectsLayer.addChild(waveLeft);
-        const waveRight = new Graphics();
-        waveRight.rect(0, -4, CANVAS_W - x, 8).fill({ color: primary, alpha: 0.8 });
-        waveRight.position.set(x, y);
-        waveRight.scale.x = 0;
-        effectsLayer.addChild(waveRight);
-        gsap.to([waveLeft.scale, waveRight.scale], { x: 1, duration: 0.5, ease: "power2.out" });
-        gsap.to([waveLeft, waveRight], {
-          alpha: 0,
-          duration: 0.5,
-          delay: 0.35,
-          onComplete: () => {
-            effectsLayer.removeChild(waveLeft);
-            effectsLayer.removeChild(waveRight);
-          },
-        });
+        // Roar shockwave rippling outward from the dragon to span the whole
+        // canvas width. Wide, flat *elliptical ring strokes* (a staggered
+        // pair) rather than the old pair of hard-edged filled rectangles,
+        // which read as a stray bar pinned under the dragon rather than an
+        // effect ("下側に変なバーみたいなの").
+        for (let i = 0; i < 2; i++) {
+          const shock = new Graphics();
+          shock
+            .ellipse(0, 0, CANVAS_W * 0.5, 18)
+            .stroke({ color: i === 0 ? secondary : primary, width: 3, alpha: 0.7 });
+          shock.position.set(x, y);
+          shock.scale.set(0.06);
+          effectsLayer.addChild(shock);
+          gsap.to(shock.scale, { x: 1.1, y: 1.1, duration: 0.55, delay: i * 0.09, ease: "power2.out" });
+          gsap.to(shock, {
+            alpha: 0,
+            duration: 0.55,
+            delay: i * 0.09,
+            onComplete: () => effectsLayer.removeChild(shock),
+          });
+        }
 
         // Central flash/burst/ring, all sized and timed well beyond the
         // normal per-hit versions above.
@@ -1472,7 +1469,7 @@ export default function GameCanvas({ session, paused }: Props) {
         }
 
         // Full-canvas dark flash — sells "screen-wide" beyond just the
-        // shockwave bar.
+        // shockwave rings.
         const vignette = new Graphics();
         vignette.rect(0, 0, CANVAS_W, CANVAS_H).fill({ color: primary, alpha: 0 });
         effectsLayer.addChild(vignette);
