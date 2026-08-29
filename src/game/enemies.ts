@@ -75,7 +75,9 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
   dragon: {
     id: "dragon",
     name: "ドラゴン",
-    baseHp: 2200,
+    // ~5x the previous 2200 — a solo boss wave should be a real wall, not
+    // something a maxed board melts in a couple of seconds.
+    baseHp: 11000,
     baseSpeed: 0.05,
     baseDamage: 130,
     coinDropChance: 1,
