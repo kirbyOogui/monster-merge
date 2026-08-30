@@ -80,21 +80,36 @@ const arrowStyle: CSSProperties = {
 export default function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [wasOpen, setWasOpen] = useState(open);
+  // Stays mounted through the slide-down so the exit animation can play.
+  const [mounted, setMounted] = useState(open);
   const last = SLIDES.length - 1;
 
   const go = useCallback((delta: number) => {
     setIndex((i) => Math.min(last, Math.max(0, i + delta)));
   }, [last]);
 
-  // Reset to slide 1 each time it opens — done during render (React's
-  // "adjusting state on a prop change" pattern) rather than in an effect.
+  // Adjust state on the `open` prop during render (React's documented
+  // pattern) rather than in an effect: reset to slide 1 and re-mount.
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setIndex(0);
+    if (open) {
+      setIndex(0);
+      setMounted(true);
+    }
   }
 
+  const closing = mounted && !open;
+
   useEffect(() => {
-    if (!open) return;
+    // Unmount once the slide-down has had time to finish (kept in an
+    // async callback, so it isn't a synchronous set-state-in-effect).
+    if (!closing) return;
+    const t = setTimeout(() => setMounted(false), 340);
+    return () => clearTimeout(t);
+  }, [closing]);
+
+  useEffect(() => {
+    if (!mounted) return;
     // Only ← / → navigate. Closing is deliberately the one explicit
     // "閉じる" button below the modal — no Esc, no backdrop click.
     const onKey = (e: KeyboardEvent) => {
@@ -108,12 +123,13 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, go]);
+  }, [mounted, go]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
+      className="howto-backdrop"
       role="dialog"
       aria-modal="true"
       aria-label="使い方"
@@ -122,28 +138,39 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
         inset: 0,
         zIndex: 50,
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 14,
         padding: 16,
         background: "rgba(10,16,22,0.85)",
+        animation: `${closing ? "howto-fade-out" : "howto-fade-in"} 0.28s ease forwards`,
       }}
     >
       <div
+        className="howto-slider"
         style={{
-          width: "min(92vw, 380px)",
-          // Leaves headroom below for the outside 閉じる button (the only
-          // exit) so it can't get pushed off a short screen.
-          maxHeight: "min(78vh, 680px)",
           display: "flex",
           flexDirection: "column",
-          background: "var(--panel)",
-          border: "1px solid #2a3d52",
-          borderRadius: 20,
-          overflow: "hidden",
+          alignItems: "center",
+          gap: 14,
+          animation: closing
+            ? "howto-slide-down 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards"
+            : "howto-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         }}
       >
+        <div
+          style={{
+            width: "min(92vw, 380px)",
+            // Leaves headroom below for the outside 閉じる button (the only
+            // exit) so it can't get pushed off a short screen.
+            maxHeight: "min(78vh, 680px)",
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--panel)",
+            border: "1px solid #2a3d52",
+            borderRadius: 20,
+            overflow: "hidden",
+          }}
+        >
         <div style={{ flex: 1, overflow: "hidden" }}>
           <div
             style={{
@@ -219,6 +246,11 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
                         fill
                         draggable={false}
                         sizes="320px"
+                        // Slide 1 preloads; the rest load right away too
+                        // (all six are only ~330KB) so swiping never waits
+                        // — off-screen track slides don't reliably trigger
+                        // lazy-load.
+                        {...(s.n === 1 ? { priority: true } : { loading: "eager" as const })}
                         style={{ objectFit: "cover" }}
                       />
                     </div>
@@ -274,14 +306,16 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
         </div>
       </div>
 
-      {/* The only way out — deliberately outside the card, bottom-center. */}
-      <button
-        className="press-btn"
-        onClick={onClose}
-        style={{ ...secondaryButtonStyle(true), padding: "10px 32px" }}
-      >
-        閉じる
-      </button>
+        {/* The only way out — deliberately outside the card, bottom-center.
+            Slides with the card as one group. */}
+        <button
+          className="press-btn"
+          onClick={onClose}
+          style={{ ...secondaryButtonStyle(true), padding: "10px 32px" }}
+        >
+          閉じる
+        </button>
+      </div>
     </div>
   );
 }

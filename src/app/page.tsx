@@ -28,11 +28,13 @@ export default function TitlePage() {
       <div>
         <div className="title-logo-row">
           <Image
-            src="/assets/title-logo.png"
+            src="/assets/title-logo.webp"
             alt="がったいモンスターズ"
-            width={1536}
-            height={1024}
+            width={840}
+            height={560}
             priority
+            fetchPriority="high"
+            sizes="(max-width: 520px) 85vw, 440px"
             style={{ width: "min(85vw, 440px)", height: "auto" }}
           />
         </div>
