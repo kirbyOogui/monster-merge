@@ -17,7 +17,9 @@ export const MONSTER_SPECIES: MonsterSpecies[] = [
   { id: "bouldros", name: "ボルドロス", shape: "2x2", color: 0xd94e4e },
 ];
 
-export const MONSTER_BY_ID: Record<string, MonsterSpecies> = Object.fromEntries(
+// `| undefined` so an unknown id is a compile-time-visible possibility —
+// `getSpecies` below is the guarded accessor callers should use.
+export const MONSTER_BY_ID: Record<string, MonsterSpecies | undefined> = Object.fromEntries(
   MONSTER_SPECIES.map((m) => [m.id, m]),
 );
 

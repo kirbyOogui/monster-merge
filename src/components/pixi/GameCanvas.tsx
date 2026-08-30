@@ -813,6 +813,7 @@ export default function GameCanvas({ session, paused }: Props) {
   useEffect(() => {
     sessionRef.current = session;
   });
+  const appRef = useRef<Application | null>(null);
   const pausedRef = useRef(paused);
   useEffect(() => {
     pausedRef.current = paused;
@@ -820,8 +821,18 @@ export default function GameCanvas({ session, paused }: Props) {
     // gsap's independent RAF ticker, not this component's `app.ticker` —
     // pausing/resuming the global timeline is what freezes those too while
     // the pause menu is open, instead of just the simulation itself.
-    if (paused) gsap.globalTimeline.pause();
-    else gsap.globalTimeline.resume();
+    if (paused) {
+      // A screen-shake tween (epic-hit / dragon breach) moves `app.stage`
+      // by a few px; freezing the timeline mid-shake would leave the whole
+      // scene visibly offset behind the pause menu. Cancel any shake and
+      // re-centre the stage before pausing.
+      const stage = appRef.current?.stage;
+      if (stage) {
+        gsap.killTweensOf(stage);
+        stage.position.set(0, 0);
+      }
+      gsap.globalTimeline.pause();
+    } else gsap.globalTimeline.resume();
     // If the component unmounts while paused (the pause menu's "タイトルへ"
     // / "ランキングへ" links navigate away), always resume on the way out —
     // otherwise gsap's global timeline is left paused process-wide and
@@ -842,6 +853,7 @@ export default function GameCanvas({ session, paused }: Props) {
     let destroyed = false;
     let initialized = false;
     const app = new Application();
+    appRef.current = app;
 
     (async () => {
       await app.init({
@@ -2078,6 +2090,7 @@ export default function GameCanvas({ session, paused }: Props) {
       gsap.globalTimeline.resume();
       for (const anim of gsap.globalTimeline.getChildren(true, true, true)) anim.kill();
       if (initialized) app.destroy(true, { children: true });
+      appRef.current = null;
     };
   }, []);
 

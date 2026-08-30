@@ -160,6 +160,9 @@ export class BattleEngine {
   }
 
   spendReroll(): boolean {
+    // Reroll is a reward-phase action only (the UI only shows the button
+    // there) — guard the engine too so it can't be driven out of phase.
+    if (this.phase !== "reward") return false;
     if (this.coins < this.rerollCost) return false;
     this.coins -= this.rerollCost;
     this.rewardOffer = generateRewardOffer(this.rng);

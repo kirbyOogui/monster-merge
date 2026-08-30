@@ -5,7 +5,10 @@ import type { EnemyDef } from "./types";
  * enemies share the same walk/hit/die behavior — stat-only variety.
  * Special behaviors (shield/fast/boss) are explicitly Phase2 scope.
  */
-export const ENEMY_DEFS: Record<string, EnemyDef> = {
+// `| undefined` on the value so lookups by an arbitrary string id are
+// typed as possibly-missing — the spawn/wave/render code all guards for
+// that, and this makes the compiler enforce those guards.
+export const ENEMY_DEFS: Record<string, EnemyDef | undefined> = {
   bat: {
     id: "bat",
     name: "コウモリ",

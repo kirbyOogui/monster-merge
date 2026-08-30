@@ -1,3 +1,4 @@
+import { maxLevelForSpecies } from "./merge";
 import { MONSTER_SPECIES } from "./monsters";
 import { defaultRng, pickWeighted, type Rng } from "./rng";
 import type { Level, RewardOfferEntry } from "./types";
@@ -25,18 +26,26 @@ function randomRewardLevel(rng: Rng): Level {
   return pickWeighted(REWARD_LEVEL_WEIGHTS, rng);
 }
 
+// Monotonic counter for unique offer ids — `Date.now()` would tie ids to
+// wall-clock time (two offers in the same millisecond could collide) and
+// break the module's otherwise seed-deterministic, testable behavior.
+let offerSeq = 0;
+
 export function generateRewardOffer(rng: Rng = defaultRng): RewardOfferEntry[] {
-  return Array.from({ length: REWARD_OFFER_SIZE }, (_, i) => ({
-    offerId: `offer-${Date.now()}-${i}-${Math.floor(rng() * 1e6)}`,
-    speciesId: randomSpeciesId(rng),
-    level: randomRewardLevel(rng),
-  }));
+  return Array.from({ length: REWARD_OFFER_SIZE }, () => {
+    const speciesId = randomSpeciesId(rng);
+    // Never offer above the species' own cap (1x1 stops at Lv4). A no-op
+    // while REWARD_LEVEL_WEIGHTS tops out at Lv3, but keeps the invariant
+    // if those weights are ever retuned upward.
+    const level = Math.min(randomRewardLevel(rng), maxLevelForSpecies(speciesId)) as Level;
+    return { offerId: `offer-${++offerSeq}`, speciesId, level };
+  });
 }
 
 /** Always Lv1 so the initial 3 starting monsters can't roll a free head start. */
 export function generateInitialMonsters(rng: Rng = defaultRng): RewardOfferEntry[] {
-  return Array.from({ length: 3 }, (_, i) => ({
-    offerId: `initial-${i}-${Math.floor(rng() * 1e6)}`,
+  return Array.from({ length: 3 }, () => ({
+    offerId: `offer-${++offerSeq}`,
     speciesId: randomSpeciesId(rng),
     level: 1 as Level,
   }));
