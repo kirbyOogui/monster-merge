@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useGameSession } from "@/hooks/useGameSession";
+import HowToModal from "@/components/HowToModal";
 import { CANVAS_H, CANVAS_W, SPAWN_HEADROOM } from "@/components/pixi/layout";
 import { rerollButtonStyle, secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
 
@@ -26,6 +27,7 @@ export default function GamePage() {
   // menu on top of a run that keeps playing out underneath.
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
+  const [howToOpen, setHowToOpen] = useState(false);
   // The info panel above the canvas is taller during "initial-placement"/
   // "reward" (extra instructions + buttons) than during "battle" (just the
   // Wave/coins/kills row) — scoring the scale off whatever height is
@@ -414,6 +416,9 @@ export default function GamePage() {
             <button className="press-btn" onClick={closeMenu} style={startButtonStyle(true)}>
               再開
             </button>
+            <button className="press-btn" onClick={() => setHowToOpen(true)} style={secondaryButtonStyle(true)}>
+              使い方
+            </button>
             <button
               className="press-btn"
               onClick={() => {
@@ -436,6 +441,11 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      {/* Sibling of the scaled `contentRef` div (like the pause menu) so its
+          fixed positioning is against the viewport, not the zoomed game
+          box. zIndex 50 in HowToModal keeps it above the pause menu. */}
+      <HowToModal open={howToOpen} onClose={() => setHowToOpen(false)} />
     </main>
   );
 }

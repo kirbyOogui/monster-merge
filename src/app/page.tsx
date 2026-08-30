@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { HowToLauncher } from "@/components/HowToModal";
 import TitleFooter from "@/components/TitleFooter";
 import { secondaryButtonStyle, startButtonStyle } from "@/components/ui/button-styles";
 
@@ -44,6 +45,7 @@ export default function TitlePage() {
         <Link className="press-btn" href="/game" style={{ ...startButtonStyle(true), padding: "14px 0", fontSize: "1.1rem" }}>
           スタート
         </Link>
+        <HowToLauncher className="press-btn" style={{ ...secondaryButtonStyle(true), padding: "14px 0", width: "100%" }} />
         <Link className="press-btn" href="/ranking" style={{ ...secondaryButtonStyle(true), padding: "14px 0" }}>
           ランキング
         </Link>
