@@ -23,6 +23,13 @@ export function maxLevelForSpecies(speciesId: string): Level {
  * pickup be checked against a board monster without a full anchor/shape. */
 export type MergeCandidate = Pick<PlacedMonster, "instanceId" | "speciesId" | "level">;
 
+/** Adapts a not-yet-placed tray/reward item (identity = `offerId`, no
+ * board `instanceId`) into a `MergeCandidate`. Use instead of hand-rolling
+ * the `{ instanceId: x.offerId, ... }` object at each `canMerge` call. */
+export function offerMergeCandidate(x: { offerId: string; speciesId: string; level: Level }): MergeCandidate {
+  return { instanceId: x.offerId, speciesId: x.speciesId, level: x.level };
+}
+
 /**
  * Same species + same level merge into level+1 (capped per-shape via
  * `maxLevelForSpecies` — 1x1 caps at Lv4, every other shape at Lv5).

@@ -1,12 +1,4 @@
-import type {
-  AttackRangeType,
-  Level,
-  ResolvedMonsterStats,
-  ShapeCombatStats,
-  ShapeDef,
-  ShapeId,
-  Vec2,
-} from "./types";
+import type { Level, ResolvedMonsterStats, ShapeCombatStats, ShapeDef, ShapeId, Vec2 } from "./types";
 
 export const SHAPES: Record<ShapeId, ShapeDef> = {
   "1x1": { id: "1x1", label: "1×1", cells: [{ row: 0, col: 0 }] },
@@ -145,7 +137,7 @@ export function resolveMonsterStats(
     attackIntervalMs: Math.round(
       base.attackIntervalMs * LEVEL_INTERVAL_MULTIPLIER[level],
     ),
-    rangeType: base.rangeType as AttackRangeType,
+    rangeType: base.rangeType,
     maxTargets,
   };
 }

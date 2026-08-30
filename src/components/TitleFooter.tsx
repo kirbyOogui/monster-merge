@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-/** Public URL of the deployed game (Vercel production alias). */
-const SITE_URL = "monster-merge-lime.vercel.app";
+/** Public URL of the deployed game. Override via NEXT_PUBLIC_SITE_URL
+ * (e.g. a custom domain); falls back to the current Vercel alias. */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "monster-merge-lime.vercel.app";
 
 /**
  * Footer under the title menu: a copyright line (always shown) plus the

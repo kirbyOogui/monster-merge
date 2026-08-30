@@ -19,9 +19,9 @@ import { clampAnchor, tryMergeTrayItems, type TrayItem } from "@/game/session";
 import { MONSTER_SPECIES, getSpecies } from "@/game/monsters";
 import { ENEMY_DEFS, ENEMY_IDS } from "@/game/enemies";
 import { canPlace, findMonsterAtCell } from "@/game/board";
-import { canMerge, maxLevelForSpecies } from "@/game/merge";
+import { canMerge, maxLevelForSpecies, offerMergeCandidate } from "@/game/merge";
 import { SHAPES, occupiedCells, shapeExtent } from "@/game/shapes";
-import type { EnemyInstance, PlacedMonster, ShapeId, Vec2 } from "@/game/types";
+import { BOARD_SIZE, type EnemyInstance, type PlacedMonster, type ShapeId, type Vec2 } from "@/game/types";
 import {
   BOARD_PX,
   BOARD_X,
@@ -744,8 +744,8 @@ class EnemyView {
 function drawStaticBoard(stage: Container) {
   const g = new Graphics();
   g.rect(BOARD_X - 4, BOARD_Y - 4, BOARD_PX + 8, BOARD_PX + 8).fill({ color: 0x0b1118, alpha: 0.55 });
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
       const cx = BOARD_X + col * CELL;
       const cy = BOARD_Y + row * CELL;
       g.rect(cx, cy, CELL - 2, CELL - 2).fill({ color: 0x1c2b3a, alpha: 0.55 });
@@ -763,8 +763,8 @@ function drawStaticBoard(stage: Container) {
  * show the monster on top rather than the star poking through it. */
 function drawBoardStars(): Graphics {
   const g = new Graphics();
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
       const cx = BOARD_X + col * CELL + CELL / 2;
       const cy = BOARD_Y + row * CELL + CELL / 2;
       drawCellStar(g, cx, cy);
@@ -780,7 +780,7 @@ function drawDropPreview(g: Graphics, cells: Vec2[], valid: boolean) {
   g.clear();
   const color = valid ? 0x4ecb71 : 0xd94e4e;
   for (const cell of cells) {
-    if (cell.row < 0 || cell.row > 3) continue;
+    if (cell.row < 0 || cell.row >= BOARD_SIZE) continue;
     const x = BOARD_X + cell.col * CELL;
     const y = BOARD_Y + cell.row * CELL;
     g.roundRect(x + 1, y + 1, CELL - 4, CELL - 4, 6).fill({ color, alpha: 0.4 }).stroke({ color, width: 2, alpha: 0.9 });
@@ -1593,10 +1593,7 @@ export default function GameCanvas({ session, paused }: Props) {
             const target = findOverlappingTraySlot(drag, drag.item.offerId);
             dropPreview.clear();
             if (target) {
-              const valid = canMerge(
-                { instanceId: drag.item.offerId, speciesId: drag.item.speciesId, level: drag.item.level },
-                { instanceId: target.item.offerId, speciesId: target.item.speciesId, level: target.item.level },
-              );
+              const valid = canMerge(offerMergeCandidate(drag.item), offerMergeCandidate(target.item));
               const { w: tw, h: th } = shapeSizePx(target.item.shape, TRAY_CELL, TRAY_TILE_MARGIN);
               drawSlotPreview(dropPreview, target.homePx, tw, th, valid);
             }

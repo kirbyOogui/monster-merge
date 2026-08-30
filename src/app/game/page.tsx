@@ -83,22 +83,30 @@ export default function GamePage() {
     const el = contentRef.current;
     if (!el) return;
 
-    function updateScale() {
-      if (!el) return;
-      const naturalHeight = el.scrollHeight;
-      // `env(safe-area-inset-top)` has no direct JS accessor — a
-      // zero-size probe element with that as its padding, measured via
-      // getComputedStyle, is the standard workaround. Needed so the scale
-      // math below accounts for the same inset `<main>`'s own top padding
-      // reserves in CSS (see the `padding` comment further down) —
-      // without it, content sized to fill the *full* viewport height
-      // would overflow past the bottom once that top inset pushes
-      // everything down.
+    // `env(safe-area-inset-top)` has no direct JS accessor — a zero-size
+    // probe element with that as its padding, measured via
+    // getComputedStyle, is the standard workaround. The inset only
+    // changes on orientation/notch changes, which also fire `resize`, so
+    // read it once here and re-read only from the resize handler rather
+    // than building a throwaway <div> on every ResizeObserver tick.
+    function readSafeAreaTop(): number {
       const probe = document.createElement("div");
       probe.style.cssText = "position:fixed;top:0;left:0;height:0;padding-top:env(safe-area-inset-top,0px);";
       document.body.appendChild(probe);
-      const safeAreaTop = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+      const v = parseFloat(getComputedStyle(probe).paddingTop) || 0;
       document.body.removeChild(probe);
+      return v;
+    }
+    let safeAreaTop = readSafeAreaTop();
+
+    function updateScale() {
+      if (!el) return;
+      const naturalHeight = el.scrollHeight;
+      // Needed so the scale math below accounts for the same inset
+      // `<main>`'s own top padding reserves in CSS (see the `padding`
+      // comment further down) — without it, content sized to fill the
+      // *full* viewport height would overflow past the bottom once that
+      // top inset pushes everything down.
       // GameCanvas's own root div starts with no explicit height and only
       // gets its real size once Pixi's async `app.init()` resolves and
       // appends the canvas (see GameCanvas.tsx) — so there's a brief
@@ -141,13 +149,18 @@ export default function GamePage() {
       setScale(next > 0 ? next : 1);
     }
 
+    function onResize() {
+      safeAreaTop = readSafeAreaTop();
+      updateScale();
+    }
+
     updateScale();
     const ro = new ResizeObserver(updateScale);
     ro.observe(el);
-    window.addEventListener("resize", updateScale);
+    window.addEventListener("resize", onResize);
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", updateScale);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 

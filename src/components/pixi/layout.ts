@@ -1,4 +1,4 @@
-import type { Vec2 } from "@/game/types";
+import { BOARD_SIZE, type Vec2 } from "@/game/types";
 
 /**
  * Portrait layout: enemies spawn near the top and walk DOWN toward the
@@ -9,7 +9,7 @@ import type { Vec2 } from "@/game/types";
  * defended zones.
  */
 export const CELL = 64;
-export const BOARD_PX = CELL * 4;
+export const BOARD_PX = CELL * BOARD_SIZE;
 export const CANVAS_W = 380;
 export const BOARD_X = (CANVAS_W - BOARD_PX) / 2;
 

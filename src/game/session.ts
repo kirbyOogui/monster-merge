@@ -1,10 +1,10 @@
 import { canPlace, findMonsterAtCell } from "./board";
 import { generateInitialMonsters } from "./gacha";
-import { canMerge, tryMerge } from "./merge";
+import { canMerge, offerMergeCandidate, tryMerge } from "./merge";
 import { getSpecies } from "./monsters";
 import { defaultRng, type Rng } from "./rng";
 import { occupiedCells, shapeExtent } from "./shapes";
-import type { Level, PlacedMonster, RewardOfferEntry, ShapeId, Vec2 } from "./types";
+import { BOARD_SIZE, type Level, type PlacedMonster, type RewardOfferEntry, type ShapeId, type Vec2 } from "./types";
 
 let instanceSeq = 0;
 export function nextInstanceId(): string {
@@ -48,12 +48,12 @@ export function placedMonsterToRewardEntry(m: PlacedMonster): RewardOfferEntry {
   };
 }
 
-/** Clamp a raw drag anchor so the shape always stays on the 4x4 board. */
+/** Clamp a raw drag anchor so the shape always stays on the board. */
 export function clampAnchor(shape: ShapeId, anchor: Vec2): Vec2 {
   const { rows, cols } = shapeExtent(shape);
   return {
-    row: Math.min(Math.max(anchor.row, 0), 4 - rows),
-    col: Math.min(Math.max(anchor.col, 0), 4 - cols),
+    row: Math.min(Math.max(anchor.row, 0), BOARD_SIZE - rows),
+    col: Math.min(Math.max(anchor.col, 0), BOARD_SIZE - cols),
   };
 }
 
@@ -165,7 +165,7 @@ export function drawInitialHand(rng: Rng = defaultRng): TrayItem[] {
  * placed. `target` keeps its offerId/slot; `dragged` is consumed.
  */
 export function tryMergeTrayItems(target: TrayItem, dragged: TrayItem): TrayItem | null {
-  if (!canMerge({ instanceId: target.offerId, speciesId: target.speciesId, level: target.level }, { instanceId: dragged.offerId, speciesId: dragged.speciesId, level: dragged.level })) {
+  if (!canMerge(offerMergeCandidate(target), offerMergeCandidate(dragged))) {
     return null;
   }
   return { ...target, level: (target.level + 1) as Level };

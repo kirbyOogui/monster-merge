@@ -1,6 +1,6 @@
 import { ENEMY_DEFS } from "./enemies";
 import { generateRewardOffer, REROLL_COST } from "./gacha";
-import { canMerge } from "./merge";
+import { canMerge, offerMergeCandidate } from "./merge";
 import { defaultRng, type Rng } from "./rng";
 import { resolveMonsterStats } from "./shapes";
 import { waveScaling } from "./waves";
@@ -203,7 +203,7 @@ export class BattleEngine {
     const dragged = this.rewardOffer.find((o) => o.offerId === draggedOfferId);
     const target = this.rewardOffer.find((o) => o.offerId === targetOfferId);
     if (!dragged || !target) return false;
-    if (!canMerge({ instanceId: dragged.offerId, speciesId: dragged.speciesId, level: dragged.level }, { instanceId: target.offerId, speciesId: target.speciesId, level: target.level })) {
+    if (!canMerge(offerMergeCandidate(dragged), offerMergeCandidate(target))) {
       return false;
     }
     const merged: RewardOfferEntry = { ...target, level: (target.level + 1) as Level };

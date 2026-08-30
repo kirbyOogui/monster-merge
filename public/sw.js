@@ -33,7 +33,14 @@ self.addEventListener("fetch", (event) => {
           if (response.ok) cache.put(request, response.clone());
           return response;
         })
-        .catch(() => cached);
+        .catch(() => {
+          // Offline. Fall back to the cached copy if we have one;
+          // otherwise re-throw so `respondWith` gets a rejected promise
+          // (a real network error) rather than resolving to `undefined`,
+          // which the browser treats as a broken response.
+          if (cached) return cached;
+          throw new Error("offline and no cached copy");
+        });
       // Serve the cached copy instantly when there is one (fast repeat
       // loads), while always refreshing it in the background for next
       // time — so a re-generated asset under the same filename (this
