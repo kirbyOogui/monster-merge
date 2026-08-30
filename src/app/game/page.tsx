@@ -416,9 +416,6 @@ export default function GamePage() {
             <button className="press-btn" onClick={closeMenu} style={startButtonStyle(true)}>
               再開
             </button>
-            <button className="press-btn" onClick={() => setHowToOpen(true)} style={secondaryButtonStyle(true)}>
-              使い方
-            </button>
             <button
               className="press-btn"
               onClick={() => {
@@ -429,15 +426,15 @@ export default function GamePage() {
             >
               リトライ
             </button>
+            <button className="press-btn" onClick={() => setHowToOpen(true)} style={secondaryButtonStyle(true)}>
+              使い方
+            </button>
             <Link className="press-btn" href="/" style={secondaryButtonStyle(true)}>
               タイトルへ戻る
             </Link>
             <Link className="press-btn" href="/ranking" style={secondaryButtonStyle(true)}>
               ランキングへ
             </Link>
-            <button className="press-btn" onClick={closeMenu} style={secondaryButtonStyle(true)}>
-              閉じる
-            </button>
           </div>
         </div>
       )}

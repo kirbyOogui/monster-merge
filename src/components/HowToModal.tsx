@@ -46,6 +46,15 @@ const SLIDES: Slide[] = [
   },
 ];
 
+/** Solid triangle glyph (not a line arrow) for the prev/next buttons. */
+function Triangle({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden focusable="false">
+      <polygon points={dir === "right" ? "4,2 13,8 4,14" : "12,2 3,8 12,14"} fill="currentColor" />
+    </svg>
+  );
+}
+
 const ARROW_SIZE = 44;
 const arrowStyle: CSSProperties = {
   width: ARROW_SIZE,
@@ -234,7 +243,7 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
         >
           {index > 0 ? (
             <button className="press-btn" onClick={() => go(-1)} aria-label="前へ" style={arrowStyle}>
-              ←
+              <Triangle dir="left" />
             </button>
           ) : (
             <span style={{ width: ARROW_SIZE, flexShrink: 0 }} aria-hidden />
@@ -257,7 +266,7 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
 
           {index < last ? (
             <button className="press-btn" onClick={() => go(1)} aria-label="次へ" style={arrowStyle}>
-              →
+              <Triangle dir="right" />
             </button>
           ) : (
             <span style={{ width: ARROW_SIZE, flexShrink: 0 }} aria-hidden />
