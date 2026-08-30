@@ -129,7 +129,7 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
 
   return (
     <div
-      className="howto-backdrop"
+      className="slide-overlay"
       role="dialog"
       aria-modal="true"
       aria-label="使い方"
@@ -142,19 +142,19 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
         justifyContent: "center",
         padding: 16,
         background: "rgba(10,16,22,0.85)",
-        animation: `${closing ? "howto-fade-out" : "howto-fade-in"} 0.28s ease forwards`,
+        animation: `${closing ? "overlay-out" : "overlay-in"} 0.28s ease forwards`,
       }}
     >
       <div
-        className="howto-slider"
+        className="slide-sheet"
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: 14,
           animation: closing
-            ? "howto-slide-down 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards"
-            : "howto-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+            ? "sheet-down 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards"
+            : "sheet-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         }}
       >
         <div

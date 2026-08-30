@@ -85,9 +85,10 @@ button {
   }
 }
 
-/* How-to modal: the card + its 閉じる button slide in from below the
- * screen on open and slide back down on close (see HowToModal.tsx). */
-@keyframes howto-slide-up {
+/* Bottom-sheet transition, shared by the how-to modal and the pause menu:
+ * the card slides in from below the screen on open and slides back down on
+ * close, while the dark backdrop cross-fades. */
+@keyframes sheet-up {
   from {
     transform: translateY(115%);
   }
@@ -96,7 +97,7 @@ button {
   }
 }
 
-@keyframes howto-slide-down {
+@keyframes sheet-down {
   from {
     transform: translateY(0);
   }
@@ -105,7 +106,7 @@ button {
   }
 }
 
-@keyframes howto-fade-in {
+@keyframes overlay-in {
   from {
     opacity: 0;
   }
@@ -114,7 +115,7 @@ button {
   }
 }
 
-@keyframes howto-fade-out {
+@keyframes overlay-out {
   from {
     opacity: 1;
   }
@@ -177,10 +178,10 @@ button {
   .press-btn:active:not(:disabled) {
     filter: brightness(0.9);
   }
-  /* Skip the how-to modal's slide/fade — it still mounts/unmounts fine
-   * (a timer, not animationend, drives the unmount). */
-  .howto-backdrop,
-  .howto-slider {
+  /* Skip the bottom-sheet slide/fade (how-to modal, pause menu) — they
+   * still mount/unmount fine (a timer, not animationend, drives it). */
+  .slide-overlay,
+  .slide-sheet {
     animation: none !important;
   }
 }

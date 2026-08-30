@@ -28,6 +28,18 @@ export default function GamePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
   const [howToOpen, setHowToOpen] = useState(false);
+  // Keeps the pause menu in the tree through its slide-down (same
+  // bottom-sheet transition as the how-to modal). `menuOpen` still drives
+  // `paused` so the game resumes the instant 再開 is pressed, while the
+  // menu slides away over it.
+  const [menuMounted, setMenuMounted] = useState(false);
+  if (menuOpen && !menuMounted) setMenuMounted(true);
+  const menuClosing = menuMounted && !menuOpen;
+  useEffect(() => {
+    if (!menuClosing) return;
+    const t = setTimeout(() => setMenuMounted(false), 340);
+    return () => clearTimeout(t);
+  }, [menuClosing]);
   // The info panel above the canvas is taller during "initial-placement"/
   // "reward" (extra instructions + buttons) than during "battle" (just the
   // Wave/coins/kills row) — scoring the scale off whatever height is
@@ -379,7 +391,7 @@ export default function GamePage() {
         )}
       </div>
 
-      {menuOpen && (
+      {menuMounted && (
         // Rendered as a sibling of the scaled `contentRef` div, not inside
         // it — that div carries `transform: scale(...)`, and a
         // `transform` on an ancestor re-anchors any `position: fixed`
@@ -388,6 +400,7 @@ export default function GamePage() {
         // cover the whole screen ("画面全体") regardless of the game's
         // current zoom level, not just the CANVAS_W-wide game area.
         <div
+          className="slide-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -396,9 +409,14 @@ export default function GamePage() {
             alignItems: "center",
             justifyContent: "center",
             background: "rgba(10,16,22,0.85)",
+            animation: `${menuClosing ? "overlay-out" : "overlay-in"} 0.28s ease forwards`,
+            // Let the resumed game take taps immediately while the menu
+            // slides away.
+            pointerEvents: menuClosing ? "none" : "auto",
           }}
         >
           <div
+            className="slide-sheet"
             style={{
               display: "flex",
               flexDirection: "column",
@@ -410,6 +428,9 @@ export default function GamePage() {
               border: "1px solid #2a3d52",
               background: "var(--panel)",
               textAlign: "center",
+              animation: menuClosing
+                ? "sheet-down 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards"
+                : "sheet-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards",
             }}
           >
             <h2 style={{ marginBottom: 4 }}>メニュー</h2>
