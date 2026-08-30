@@ -38,4 +38,17 @@ describe("resolveMonsterStats", () => {
     const lv3 = resolveMonsterStats("h3", 3);
     expect(lv3.maxTargets).toBe(lv2.maxTargets + 1);
   });
+
+  it("row/area shapes gain a *second* extra target at level 5, on top of the level-3 one", () => {
+    const base = resolveMonsterStats("h2", 1).maxTargets;
+    expect(resolveMonsterStats("h2", 3).maxTargets).toBe(base + 1);
+    expect(resolveMonsterStats("h2", 4).maxTargets).toBe(base + 1);
+    expect(resolveMonsterStats("h2", 5).maxTargets).toBe(base + 2);
+    expect(resolveMonsterStats("2x2", 5).maxTargets).toBe(resolveMonsterStats("2x2", 1).maxTargets + 2);
+  });
+
+  it("single-range shapes stay at one target even at level 5", () => {
+    expect(resolveMonsterStats("1x1", 5).maxTargets).toBe(1);
+    expect(resolveMonsterStats("v2", 5).maxTargets).toBe(1);
+  });
 });

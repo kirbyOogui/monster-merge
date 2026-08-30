@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../rng";
-import { generateWave } from "../waves";
+import waveConfig from "../waveConfig.json";
+import { generateWave, waveScaling } from "../waves";
 
 function countEnemy(wave: ReturnType<typeof generateWave>, enemyId: string): number {
   return wave.spawns.filter((s) => s.enemyId === enemyId).length;
@@ -39,5 +40,26 @@ describe("generateWave", () => {
     for (const wave of [14, 16, 20, 24, 26]) {
       expect(countEnemy(generateWave(wave, mulberry32(1)), "dragon")).toBe(0);
     }
+  });
+
+  it("grows the enemy count each wave but never past maxEnemyCount", () => {
+    expect(generateWave(1, mulberry32(1)).spawns.length).toBe(waveConfig.baseEnemyCount);
+    expect(generateWave(3, mulberry32(1)).spawns.length).toBeGreaterThan(
+      generateWave(1, mulberry32(1)).spawns.length,
+    );
+    // Wave 999 isn't a solo-boss wave ((999-15) % 10 !== 0), so it's a
+    // normal wave whose raw count is far above the cap.
+    expect(generateWave(999, mulberry32(1)).spawns.length).toBe(waveConfig.maxEnemyCount);
+  });
+});
+
+describe("waveScaling", () => {
+  it("is identity on wave 1 and scales hp / speed / damage up after that", () => {
+    expect(waveScaling(1)).toEqual({ hp: 1, speed: 1, damage: 1 });
+    const w10 = waveScaling(10);
+    expect(w10.hp).toBeGreaterThan(1);
+    expect(w10.speed).toBeGreaterThan(1);
+    expect(w10.damage).toBeGreaterThan(1);
+    expect(waveScaling(20).hp).toBeGreaterThan(w10.hp);
   });
 });

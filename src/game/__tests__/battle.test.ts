@@ -261,4 +261,128 @@ describe("BattleEngine", () => {
     engine.returnToRewardOffer({ offerId: "cand-b", speciesId: "ridgeback", level: 1 });
     expect(engine.mergeRewardOfferItems("cand-a", "cand-b")).toBe(false);
   });
+
+  it("lets a monster that survived a wave attack right away in the next one", () => {
+    // Regression for the stale-timer bug called out in startWave: a
+    // monster carried over between waves kept its `lastAttackAt` timestamp
+    // from deep in the previous wave's `elapsedMs`, so the cooldown check
+    // stayed negative and locked it out of attacking until the new wave's
+    // clock climbed back past that leftover value.
+    const engine = new BattleEngine([monster({ shape: "h2", anchor: { row: 0, col: 0 } })]);
+
+    // Wave 1: a tank the monster can't clear, run long so `elapsedMs`
+    // (and the monster's last-fire timestamp) end up large.
+    engine.startWave({ wave: 1, spawns: [{ spawnX: 0.5, enemyId: "giant", delayMs: 0 }] });
+    for (let i = 0; i < 40; i++) engine.tick(500); // ~20s simulated
+
+    // Wave 2: fresh enemy, well within attackable range after one big tick.
+    engine.startWave({ wave: 2, spawns: [{ spawnX: 0.5, enemyId: "giant", delayMs: 0 }] });
+    engine.tick(100); // enemy not down the lane far enough yet
+    const events = engine.tick(8000); // now past MIN_ATTACKABLE_PROGRESS
+    expect(events.some((e) => e.type === "attack")).toBe(true);
+  });
+
+  it("won't target an enemy that hasn't walked far enough down the lane", () => {
+    const engine = new BattleEngine([monster({ shape: "h2", anchor: { row: 0, col: 0 } })]);
+    engine.startWave({ wave: 1, spawns: [{ spawnX: 0.5, enemyId: "slime", delayMs: 0 }] });
+
+    // slime is slow — 1s is well short of MIN_ATTACKABLE_PROGRESS.
+    const early = engine.tick(1000);
+    expect(early.some((e) => e.type === "attack")).toBe(false);
+    expect(engine.getSnapshot().enemies[0].progress).toBeLessThan(0.25);
+
+    // Give it time to cross the threshold — now it's a valid target.
+    const later = engine.tick(3000);
+    expect(later.some((e) => e.type === "attack")).toBe(true);
+  });
+
+  it("spreads several monsters' attacks across several enemies instead of dogpiling one", () => {
+    const engine = new BattleEngine([
+      monster({ instanceId: "a", shape: "1x1", anchor: { row: 0, col: 0 } }),
+      monster({ instanceId: "b", shape: "1x1", anchor: { row: 0, col: 1 } }),
+      monster({ instanceId: "c", shape: "1x1", anchor: { row: 0, col: 2 } }),
+    ]);
+    engine.startWave({
+      wave: 1,
+      spawns: [
+        { spawnX: 0.2, enemyId: "orc", delayMs: 0 },
+        { spawnX: 0.5, enemyId: "orc", delayMs: 0 },
+        { spawnX: 0.8, enemyId: "orc", delayMs: 0 },
+      ],
+    });
+    const events = engine.tick(7000); // all orcs attackable, all monsters off cooldown
+    const hit = new Set(events.flatMap((e) => (e.type === "attack" ? e.targetIds : [])));
+    expect(hit.size).toBeGreaterThan(1);
+  });
+
+  it("clears a removed monster's attack cooldown so re-adding its id starts fresh", () => {
+    const engine = new BattleEngine([monster({ instanceId: "x", shape: "h2", anchor: { row: 0, col: 0 } })]);
+    engine.startWave({ wave: 1, spawns: [{ spawnX: 0.5, enemyId: "troll", delayMs: 0 }] });
+    engine.tick(7000); // "x" fires; troll (350hp) survives; lastAttackAt["x"] ~= 7000
+
+    engine.setBoard([]); // prune lastAttackAt["x"]
+    engine.setBoard([monster({ instanceId: "x", shape: "h2", anchor: { row: 1, col: 0 } })]);
+
+    // Tiny tick: if the stale ~7000 cooldown had survived the prune,
+    // elapsedMs is barely past it and no attack would fire.
+    const events = engine.tick(50);
+    expect(events.some((e) => e.type === "attack")).toBe(true);
+  });
+
+  it("still lets a monster finish off an enemy that has already breached the base", () => {
+    // A slow h2/Lv3 vs a tanky troll: the troll reaches the base and
+    // starts re-attacking (hasBreached) well before the monster can grind
+    // it down — but it stays a valid target and the monster still kills it.
+    const engine = new BattleEngine([monster({ shape: "h2", level: 3, anchor: { row: 0, col: 0 } })], mulberry32(5));
+    engine.startWave({ wave: 1, spawns: [{ spawnX: 0.5, enemyId: "troll", delayMs: 0 }] });
+
+    let sawBreach = false;
+    for (let i = 0; i < 400 && engine.getSnapshot().phase === "battle"; i++) {
+      const events = engine.tick(100);
+      if (events.some((e) => e.type === "breach")) sawBreach = true;
+    }
+
+    const snap = engine.getSnapshot();
+    expect(sawBreach).toBe(true);
+    expect(snap.enemies).toHaveLength(0); // the parked troll was killed, not left forever
+    expect(snap.killCount).toBe(1);
+    expect(snap.phase).toBe("reward");
+  });
+
+  it("refuses a reroll outside the reward phase", () => {
+    const engine = new BattleEngine([]);
+    expect(engine.spendReroll()).toBe(false); // initial-placement
+    engine.startWave({ wave: 1, spawns: [{ spawnX: 0.5, enemyId: "slime", delayMs: 0 }] });
+    expect(engine.spendReroll()).toBe(false); // battle
+  });
+
+  it("spends coins and replaces the offer on a reward-phase reroll", () => {
+    const engine = new BattleEngine(
+      [
+        monster({ instanceId: "m1", shape: "h3", level: 4, anchor: { row: 0, col: 0 } }),
+        monster({ instanceId: "m2", shape: "h3", level: 4, anchor: { row: 1, col: 0 } }),
+      ],
+      mulberry32(1),
+    );
+    engine.startWave({
+      wave: 1,
+      spawns: Array.from({ length: 40 }, (_, i) => ({ spawnX: (i % 5) / 5, enemyId: "goblin" as const, delayMs: i * 30 })),
+    });
+    runUntilNotBattle(engine, 100, 800);
+    const snap = engine.getSnapshot();
+    expect(snap.phase).toBe("reward");
+    expect(snap.coins).toBe(80); // deterministic under mulberry32(1)
+
+    const offerBefore = snap.rewardOffer.map((o) => o.offerId).join(",");
+    expect(engine.spendReroll()).toBe(true);
+    expect(engine.getSnapshot().coins).toBe(80 - 40);
+    expect(engine.getSnapshot().rewardOffer.map((o) => o.offerId).join(",")).not.toBe(offerBefore);
+
+    // Second reroll: only 40 left, exactly the cost — still affordable.
+    expect(engine.spendReroll()).toBe(true);
+    expect(engine.getSnapshot().coins).toBe(0);
+    // Third: broke now.
+    expect(engine.spendReroll()).toBe(false);
+    expect(engine.getSnapshot().coins).toBe(0);
+  });
 });
