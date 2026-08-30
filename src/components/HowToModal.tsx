@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { secondaryButtonStyle } from "@/components/ui/button-styles";
 
 interface Slide {
   /** Also the base name of the slide's image(s) under /assets/howto/ —
@@ -45,9 +46,10 @@ const SLIDES: Slide[] = [
   },
 ];
 
-const arrowStyle = (enabled: boolean): CSSProperties => ({
-  width: 44,
-  height: 44,
+const ARROW_SIZE = 44;
+const arrowStyle: CSSProperties = {
+  width: ARROW_SIZE,
+  height: ARROW_SIZE,
   flexShrink: 0,
   borderRadius: 999,
   border: "1px solid #2a3d52",
@@ -59,9 +61,8 @@ const arrowStyle = (enabled: boolean): CSSProperties => ({
   alignItems: "center",
   justifyContent: "center",
   padding: 0,
-  cursor: enabled ? "pointer" : "default",
-  opacity: enabled ? 1 : 0.35,
-});
+  cursor: "pointer",
+};
 
 /** Full-screen "使い方" carousel. No routing — the slides live on one
  * horizontal track that translates by whole viewports, so the current
@@ -85,9 +86,10 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
 
   useEffect(() => {
     if (!open) return;
+    // Only ← / → navigate. Closing is deliberately the one explicit
+    // "閉じる" button below the modal — no Esc, no backdrop click.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") go(-1);
+      if (e.key === "ArrowLeft") go(-1);
       else if (e.key === "ArrowRight") go(1);
     };
     window.addEventListener("keydown", onKey);
@@ -97,7 +99,7 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose, go]);
+  }, [open, go]);
 
   if (!open) return null;
 
@@ -106,24 +108,25 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
       role="dialog"
       aria-modal="true"
       aria-label="使い方"
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 50,
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        gap: 14,
         padding: 16,
         background: "rgba(10,16,22,0.85)",
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "relative",
           width: "min(92vw, 380px)",
-          maxHeight: "90vh",
+          // Leaves headroom below for the outside 閉じる button (the only
+          // exit) so it can't get pushed off a short screen.
+          maxHeight: "min(78vh, 680px)",
           display: "flex",
           flexDirection: "column",
           background: "var(--panel)",
@@ -132,32 +135,6 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
           overflow: "hidden",
         }}
       >
-        <button
-          onClick={onClose}
-          aria-label="閉じる"
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            zIndex: 1,
-            width: 32,
-            height: 32,
-            borderRadius: 999,
-            border: "1px solid #2a3d52",
-            background: "rgba(20,32,44,0.9)",
-            color: "var(--foreground)",
-            fontSize: 16,
-            lineHeight: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            cursor: "pointer",
-          }}
-        >
-          ✕
-        </button>
-
         <div style={{ flex: 1, overflow: "hidden" }}>
           <div
             style={{
@@ -255,15 +232,13 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
             borderTop: "1px solid #2a3d52",
           }}
         >
-          <button
-            className="press-btn"
-            onClick={() => go(-1)}
-            disabled={index === 0}
-            aria-label="前へ"
-            style={arrowStyle(index !== 0)}
-          >
-            ←
-          </button>
+          {index > 0 ? (
+            <button className="press-btn" onClick={() => go(-1)} aria-label="前へ" style={arrowStyle}>
+              ←
+            </button>
+          ) : (
+            <span style={{ width: ARROW_SIZE, flexShrink: 0 }} aria-hidden />
+          )}
 
           <div style={{ display: "flex", gap: 6 }}>
             {SLIDES.map((s, i) => (
@@ -280,17 +255,24 @@ export default function HowToModal({ open, onClose }: { open: boolean; onClose: 
             ))}
           </div>
 
-          <button
-            className="press-btn"
-            onClick={() => go(1)}
-            disabled={index === last}
-            aria-label="次へ"
-            style={arrowStyle(index !== last)}
-          >
-            →
-          </button>
+          {index < last ? (
+            <button className="press-btn" onClick={() => go(1)} aria-label="次へ" style={arrowStyle}>
+              →
+            </button>
+          ) : (
+            <span style={{ width: ARROW_SIZE, flexShrink: 0 }} aria-hidden />
+          )}
         </div>
       </div>
+
+      {/* The only way out — deliberately outside the card, bottom-center. */}
+      <button
+        className="press-btn"
+        onClick={onClose}
+        style={{ ...secondaryButtonStyle(true), padding: "10px 32px" }}
+      >
+        閉じる
+      </button>
     </div>
   );
 }
