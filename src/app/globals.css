@@ -124,6 +124,25 @@ button {
   }
 }
 
+/* Page-load entrance: content rises up from below and fades in. Same
+ * "comes up from the bottom" idea as the bottom-sheet, scaled down for
+ * in-flow page elements (used on the ranking page, staggered via
+ * per-element animation-delay). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes title-glow {
   0%,
   100% {
@@ -182,6 +201,9 @@ button {
    * still mount/unmount fine (a timer, not animationend, drives it). */
   .slide-overlay,
   .slide-sheet {
+    animation: none !important;
+  }
+  .rise-in {
     animation: none !important;
   }
 }
