@@ -96,25 +96,44 @@ button {
 }
 
 /* Shared "press" motion for the pill-style CTA buttons (start/reroll/
- * secondary, everywhere they're used) — hovering lifts the button slightly
- * and pressing sinks it flush with its own drop-shadow "lip" collapsing,
- * selling a physical push-button feel instead of the flat instant
- * color-swap a plain `:hover`/`:active` on the raw color would give.
- * `:not(:disabled)` only guards native `<button>`s — the `Link`-based
- * buttons here are never rendered disabled, so it's a no-op for those. */
+ * secondary, everywhere they're used). Deliberately exaggerated ("大げさ
+ * なくらい"): hover lifts + swells the button, pressing hard-squishes it
+ * down, and the back-eased transition makes it overshoot on release for a
+ * springy pop. `:not(:disabled)` only guards native `<button>`s — the
+ * `Link`-based buttons here are never rendered disabled, so it's a no-op
+ * for those. */
 .press-btn {
-  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.16s cubic-bezier(0.34, 1.7, 0.5, 1),
+    filter 0.12s ease,
+    box-shadow 0.12s ease;
+  will-change: transform;
 }
 
 .press-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
+  transform: translateY(-3px) scale(1.06);
+  filter: brightness(1.13);
 }
 
 .press-btn:active:not(:disabled) {
-  transform: translateY(2px);
-  filter: brightness(0.96);
+  transform: translateY(7px) scale(0.84);
+  filter: brightness(0.8);
   box-shadow: none !important;
+  transition:
+    transform 0.07s ease-out,
+    filter 0.07s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press-btn,
+  .press-btn:hover:not(:disabled),
+  .press-btn:active:not(:disabled) {
+    transition: filter 0.1s ease;
+    transform: none;
+  }
+  .press-btn:active:not(:disabled) {
+    filter: brightness(0.9);
+  }
 }
 
 /* Title screen logo image — float/glow animation carried over from the
