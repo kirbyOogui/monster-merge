@@ -28,5 +28,12 @@
     "eslint-config-next": "16.4.2",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "brace-expansion@<2": "^1.1.21",
+    "brace-expansion@>=4": "^5.0.12",
+    "js-yaml": "^4.3.2",
+    "vite": "^8.3.5",
+    "zod": "^4.6.6"
   }
 }
